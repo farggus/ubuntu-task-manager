@@ -37,3 +37,4 @@ Thumbs.db
 # Custom
 custom_scripts/
 *.log
+/.gemini
