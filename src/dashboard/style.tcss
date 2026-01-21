@@ -1,0 +1,131 @@
+Screen {
+    layout: vertical;
+}
+
+/* Header and Footer are docked by default */
+
+/* CompactSystemInfo styles */
+CompactSystemInfo {
+    height: auto;
+    dock: top;
+    padding: 0 0;
+    border: solid $secondary;
+    margin: 1;
+}
+
+TabbedContent {
+    height: 1fr;
+    width: 100%;
+}
+
+DataTable {
+    height: 1fr;
+    border: solid $secondary;
+}
+
+.help-text {
+    dock: bottom;
+    height: 1;
+    padding: 0 1;
+    background: $boost;
+}
+
+/* Columns in System Info */
+.col-overview {
+    width: 1.3fr;
+    padding: 0 1;
+    border-right: solid $secondary;
+    height: auto;
+}
+.col-resources {
+    width: 1.7fr;
+    padding: 0 1;
+    border-right: solid $secondary;
+    height: auto;
+}
+.col-disk {
+    width: 1fr;
+    padding: 0 1;
+    height: auto;
+}
+
+/* Section Headers */
+.section-header {
+    text-style: bold;
+    width: 100%;
+    text-align: center; /* Optional: centers the header */
+    background: $surface;
+    color: $text;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+/* Specific styling for left aligned headers if preferred */
+.col-overview .section-header,
+.col-resources .section-header,
+.col-disk .section-header {
+    text-align: left;
+}
+
+
+/* Resource Items */
+.res-item {
+    margin-top: 1; 
+}
+.res-item-first {
+    margin-top: 0; 
+}
+
+.res-label {
+    text-style: bold;
+    margin-bottom: 0;
+    width: 100%;
+}
+
+/* Sparklines */
+Sparkline {
+    height: 2;
+    margin: 0;
+    padding: 0;
+    color: $accent;
+    width: 100%;
+}
+
+/* Memory/Swap Row */
+.ms-row {
+    height: auto;
+    margin-top: 1;
+    width: 100%;
+}
+.ms-col {
+    width: 1fr;
+    margin-right: 2;
+    height: auto;
+}
+
+/* Row with Sparkline and Value */
+.spark-val-row {
+    height: 2;
+    width: 100%;
+    layout: horizontal;
+}
+.spark-val-row Sparkline {
+    width: 1fr;
+}
+.spark-val-row Label {
+    width: 7;
+    text-align: right;
+    padding-top: 0; 
+}
+
+/* Inner Tables */
+#basic_info, #disk_info {
+    height: auto;
+    margin: 0;
+    padding: 0;
+}
+
+.warning-text {
+    color: $error;
+    text-style: bold;
+}

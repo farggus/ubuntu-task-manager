@@ -1,0 +1,41 @@
+# Ubuntu Task Manager (UTM) Configuration
+
+# Refresh intervals (in seconds)
+refresh_intervals:
+  system: 5
+  services: 10
+  network: 15
+  tasks: 30
+
+# Collectors to enable
+collectors:
+  - system
+  - services
+  - network
+  - tasks
+
+# Docker settings
+docker:
+  enabled: true
+  socket: unix:///var/run/docker.sock
+
+# Network monitoring
+network:
+  interfaces: all  # or list specific: [eth0, wlan0]
+  check_firewall: true
+  check_open_ports: true
+
+# Services to monitor (systemd)
+services:
+  monitor_all: false  # if true, shows all services
+  specific_services:
+    - nginx
+    - postgresql
+    - redis
+    - ssh
+    # Add your services here
+
+# Custom commands/scripts
+custom_checks:
+  enabled: true
+  scripts_dir: ./custom_scripts
