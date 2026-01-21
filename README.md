@@ -49,13 +49,6 @@ Displayed in 3 columns with live data:
 - `Ctrl+R` - Refresh all data
 - `Ctrl+S` - Export snapshot to JSON
 
-### Architecture
-- **Modular Collector System**: 6 collectors (System, Services, Network, Tasks, Processes, Users)
-- **Extensible Widgets**: Each tab is a separate widget with hotkeys
-- **Configurable**: Setup via YAML file
-- **Logging**: RotatingFileHandler with live tail
-- **Export**: JSON snapshot of system state
-
 ## Installation
 
 ### 1. Clone and Install Dependencies
@@ -86,45 +79,20 @@ You can run with `sudo` or configure sudo without password for specific commands
 
 ### Basic Start
 ```bash
-python main.py
+python src/main.py
 ```
 
 ### With Custom Configuration
 ```bash
-python main.py --config /path/to/custom-config.yaml
+python src/main.py --config /path/to/custom-config.yaml
 ```
 
-### Hotkeys
-
-**Navigation:**
-- `1-8, 0` - Switch tabs
-- `Tab` / `Shift+Tab` - Next/Previous tab
-
-**Global:**
-- `Ctrl+Q` - Quit
-- `Ctrl+R` - Refresh all data
-- `Ctrl+S` - Export snapshot to JSON
-
-**In Tables:**
-- `↑↓` - Row navigation
-- `Enter` - Select/Action
-
-### Data Export
-
-`Ctrl+S` creates a JSON file with all information:
-
-```json
-{
-  "timestamp": "2026-01-17T12:00:00",
-  "hostname": "server",
-  "system": {...},
-  "services": {...},
-  "network": {...},
-  "tasks": {...},
-  "processes": {...},
-  "users": {...}
-}
-```
+### Helper Scripts
+Use the scripts in `scripts/` for convenience:
+- `scripts/run.sh`: Run the application
+- `scripts/install.sh`: Install dependencies
+- `scripts/reinstall.sh`: Reinstall venv
+- `scripts/uninstall.sh`: Uninstall
 
 ### Task View (CLI)
 
@@ -179,28 +147,69 @@ services:
     # Add your services here
 ```
 
-## Project Structure
+## Project Architecture
+
+### File Structure
 
 ```
 utm/
-├── src/                    # Source code
-│   ├── main.py             # Entry point
-│   ├── const.py            # App constants
-│   ├── collectors/         # Data collectors
-│   ├── dashboard/          # UI logic
-│   └── utils/              # Utilities
-├── config/                 # Configuration
-│   └── config.yaml         # Main config
-├── scripts/                # Helper scripts
-│   ├── install.sh
-│   └── run.sh
-├── docs/                   # Documentation
-│   ├── QUICKSTART.md
-│   └── ...
-├── logs/                   # Log files
-├── tests/                  # Tests
-├── requirements.txt        # Dependencies
-└── Dockerfile              # Docker build
+├── src/                        # Application Source Code
+│   ├── main.py                 # Entry point, initializes Dashboard
+│   ├── const.py                # Application constants and paths
+│   ├── list_tasks.py           # Standalone CLI for task monitoring
+│   ├── collectors/             # Data Collection Modules (Model)
+│   │   ├── base.py             # Abstract base class for collectors
+│   │   ├── system.py           # CPU, RAM, Disk, Uptime
+│   │   ├── services.py         # Systemd services & Docker containers
+│   │   ├── network.py          # Interfaces, Ports, Firewall
+│   │   ├── tasks.py            # Cron jobs & Systemd timers
+│   │   ├── processes.py        # Process management
+│   │   └── users.py            # Active sessions
+│   ├── dashboard/              # UI Modules (View/Controller)
+│   │   ├── app.py              # Main Textual App class
+│   │   ├── style.tcss          # Stylesheet
+│   │   └── widgets/            # Individual UI components
+│   │       ├── system_info.py  # Top panel
+│   │       ├── services.py     # Services tab
+│   │       ├── ...
+│   └── utils/                  # Shared Utilities
+│       └── logger.py           # Logging configuration
+├── config/                     # Configuration
+│   └── config.yaml             # Main configuration file
+├── scripts/                    # Helper Shell Scripts
+├── docs/                       # Documentation
+├── logs/                       # Application Logs
+├── tests/                      # Unit Tests
+└── Dockerfile                  # Docker build configuration
+```
+
+### Architectural Patterns
+
+- **MVC (Model-View-Controller)**:
+    - **Model**: `src/collectors` are responsible for gathering raw data from the system (using `psutil`, `docker` SDK, `systemctl`, etc.).
+    - **View**: `src/dashboard/widgets` are the visual components that display the data.
+    - **Controller**: `src/dashboard/app.py` acts as the controller, initializing collectors, handling user input (hotkeys), and orchestrating data updates.
+- **Template Method**: `BaseCollector` defines the standard `collect()` and `update()` methods that all specific collectors implement.
+- **Event-Driven**: The UI is built on `textual`, which is an event-driven framework handling timer ticks for data refresh and user keypresses.
+
+### Dependency Graph
+
+```
+src/main.py
+  ├── src/const.py
+  ├── src/utils/logger.py
+  └── src/dashboard/app.py (Textual App)
+       ├── src/collectors/ (Data Gathering)
+       │    ├── system.py (psutil)
+       │    ├── services.py (systemd, docker)
+       │    ├── network.py (psutil)
+       │    ├── tasks.py (croniter, dateutil)
+       │    ├── processes.py (psutil)
+       │    └── users.py (psutil)
+       └── src/dashboard/widgets/ (UI Components)
+            ├── system_info.py
+            ├── services.py
+            └── ...
 ```
 
 ## Extending Functionality
@@ -260,28 +269,6 @@ custom_checks:
   enabled: true
   scripts_dir: ./scripts/custom
 ```
-
-## Roadmap
-
-**Implemented in v2.0:**
-- [x] Data Export (JSON snapshot)
-- [x] Metrics History (Sparkline charts)
-- [x] Log Monitoring (Live tail)
-- [x] Service Management (start/stop/restart)
-- [x] Container Management (start/stop/restart, logs)
-- [x] CPU Temperature (via psutil)
-- [x] Package Management (apt upgrade)
-- [x] Process Management (kill zombies)
-
-**Planned:**
-- [ ] Web GUI (Flask/FastAPI) for remote access
-- [ ] CSV Export
-- [ ] Alerts and Notifications
-- [ ] Prometheus/Grafana Integration
-- [ ] LXC/LXD Container Support
-- [ ] ZFS/RAID Monitoring
-- [ ] GPU Monitoring (nvidia-smi)
-- [ ] UPS Monitoring (NUT)
 
 ## Requirements
 
