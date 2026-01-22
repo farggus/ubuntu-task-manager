@@ -1,15 +1,16 @@
 """Compact System Information widget."""
 
-from textual import work
-from textual.containers import Horizontal, Vertical
-from textual.widgets import Static, Sparkline, Label
-from rich.table import Table
-from rich.text import Text
-from rich.console import Group
-from datetime import datetime
 import os as os_module
 from collections import deque
-from typing import Dict, Any
+from datetime import datetime
+from typing import Any, Dict
+
+from rich.console import Group
+from rich.table import Table
+from rich.text import Text
+from textual import work
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Label, Sparkline, Static
 
 from collectors.system import SystemCollector
 from utils.logger import get_logger

@@ -1,11 +1,12 @@
 """Containers tab widget."""
 
+from typing import Any, Dict, List
+
+from rich.text import Text
 from textual import work
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Label, Static
-from textual.binding import Binding
-from rich.text import Text
-from typing import Dict, Any, List
 
 # We need docker library for control, not just collection
 try:
@@ -16,6 +17,7 @@ except ImportError:
 from collectors import ServicesCollector
 from utils.logger import get_logger
 from utils.ui_helpers import update_table_preserving_scroll
+
 from .container_log_modal import ContainerLogModal
 
 logger = get_logger("containers_tab")

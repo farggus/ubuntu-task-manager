@@ -1,10 +1,11 @@
 """Modal screen for displaying Docker container logs."""
 
 import threading
+
+from rich.markup import escape
+from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import RichLog, Static
-from textual.containers import Vertical
-from rich.markup import escape
 
 from utils.logger import get_logger
 

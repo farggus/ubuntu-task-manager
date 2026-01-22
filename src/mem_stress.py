@@ -1,5 +1,5 @@
-import time
 import sys
+import time
 
 chunk_size = 100 * 1024 * 1024 # 100 MB
 chunks = []

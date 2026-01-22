@@ -1,12 +1,13 @@
 """Services tab widget."""
 
+import subprocess
+from typing import Any, Dict
+
+from rich.text import Text
 from textual import work
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Label, Static
-from textual.binding import Binding
-from rich.text import Text
-import subprocess
-from typing import Dict, Any
 
 from collectors import ServicesCollector
 from utils.logger import get_logger

@@ -1,8 +1,9 @@
 """Base collector class for all data collectors."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

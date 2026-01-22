@@ -2,6 +2,7 @@
 
 from textual.widgets import DataTable
 
+
 def update_table_preserving_scroll(table: DataTable, populate_function):
     """
     Clear a DataTable and repopulate it while attempting to preserve the scroll position

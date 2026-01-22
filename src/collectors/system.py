@@ -1,19 +1,22 @@
 """System information collector."""
 
-import platform
-import psutil
-import socket
 import datetime
-import time
-import os
-import subprocess
-import shlex
-import re
 import json
+import os
+import platform
+import re
+import shlex
+import socket
+import subprocess
+import time
 from datetime import timedelta
-from typing import Dict, Any
-from .base import BaseCollector
+from typing import Any, Dict
+
+import psutil
+
 from utils.logger import get_logger
+
+from .base import BaseCollector
 
 logger = get_logger(__name__)
 

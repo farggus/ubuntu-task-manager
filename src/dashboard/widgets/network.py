@@ -1,15 +1,16 @@
 """Network tab widget."""
 
+from typing import Any, Dict
+
+from rich.text import Text
 from textual import work
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Label, Static
-from textual.binding import Binding
-from rich.text import Text
-from typing import Dict, Any
 
 from collectors import NetworkCollector
-from utils.ui_helpers import update_table_preserving_scroll
 from utils.logger import get_logger
+from utils.ui_helpers import update_table_preserving_scroll
 
 logger = get_logger("network_tab")
 

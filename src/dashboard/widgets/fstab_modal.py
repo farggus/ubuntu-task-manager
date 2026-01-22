@@ -1,13 +1,14 @@
 """Modal for editing /etc/fstab."""
 
-from textual.screen import ModalScreen
-from textual.widgets import TextArea, Static, Button
-from textual.containers import Vertical, Horizontal
-from textual.binding import Binding
-from textual import work
-import subprocess
 import os
+import subprocess
 import tempfile
+
+from textual import work
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
+from textual.widgets import Button, Static, TextArea
 
 from utils.logger import get_logger
 

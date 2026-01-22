@@ -41,4 +41,4 @@ addopts = "-v --tb=short"
 
 [tool.bandit]
 exclude_dirs = ["tests", "venv", ".venv"]
-skips = ["B404", "B603"]  # subprocess module, subprocess without shell
+skips = ["B404", "B603", "B310"]  # subprocess module, subprocess without shell, urlopen (IP validated)

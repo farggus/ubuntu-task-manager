@@ -1,8 +1,10 @@
-from collectors.services import ServicesCollector
-from rich import print
-
 # Setup logging for console output
 import logging
+
+from rich import print
+
+from collectors.services import ServicesCollector
+
 logging.basicConfig(level=logging.DEBUG)
 
 def debug():

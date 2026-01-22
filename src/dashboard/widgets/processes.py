@@ -1,14 +1,15 @@
 """Processes tab widget with filtering."""
 
-from textual import work
-from textual.containers import Vertical
-from textual.widgets import DataTable, Label, Static
-from textual.binding import Binding
-from rich.text import Text
-import psutil
 import os
 import signal
-from typing import Dict, Any
+from typing import Any, Dict
+
+import psutil
+from rich.text import Text
+from textual import work
+from textual.binding import Binding
+from textual.containers import Vertical
+from textual.widgets import DataTable, Label, Static
 
 from collectors import ProcessesCollector
 from utils.logger import get_logger

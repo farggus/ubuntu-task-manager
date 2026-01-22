@@ -1,13 +1,14 @@
 """Packages tab widget."""
 
-from textual import work
-from textual.containers import Vertical, Horizontal, Container
-from textual.widgets import DataTable, Label, Button, Static
-from textual.binding import Binding
-from rich.text import Text
-from typing import Dict, Any
-import subprocess
 import string
+import subprocess
+from typing import Any, Dict
+
+from rich.text import Text
+from textual import work
+from textual.binding import Binding
+from textual.containers import Container, Horizontal, Vertical
+from textual.widgets import Button, DataTable, Label, Static
 
 from collectors import SystemCollector
 from utils.logger import get_logger

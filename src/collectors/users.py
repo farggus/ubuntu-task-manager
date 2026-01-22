@@ -1,11 +1,14 @@
 """Users collector."""
 
-import psutil
-import pwd
 import datetime
-from typing import Dict, Any, List
-from .base import BaseCollector
+import pwd
+from typing import Any, Dict, List
+
+import psutil
+
 from utils.logger import get_logger
+
+from .base import BaseCollector
 
 logger = get_logger("users_collector")
 

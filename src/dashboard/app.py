@@ -1,44 +1,44 @@
 """Main dashboard application using Textual with tabbed interface."""
 
+import json
+import os as os_module
+import platform
+import subprocess
+from collections import deque
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
+
+import yaml
+from rich.console import Group
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
-from textual.widgets import Header, Footer, Static, TabbedContent, TabPane, DataTable, Sparkline, Label
+from textual.containers import Container, Horizontal, ScrollableContainer, Vertical
 from textual.reactive import reactive
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
-from rich.console import Group
-from datetime import datetime
-import platform
-import yaml
-import subprocess
-import os as os_module
-import json
-from pathlib import Path
-from typing import Dict, Any, List
-from collections import deque
+from textual.widgets import DataTable, Footer, Header, Label, Sparkline, Static, TabbedContent, TabPane
 
 from collectors import (
-    SystemCollector,
-    ServicesCollector,
     NetworkCollector,
-    TasksCollector,
     ProcessesCollector,
-    UsersCollector
+    ServicesCollector,
+    SystemCollector,
+    TasksCollector,
+    UsersCollector,
 )
-
-from dashboard.widgets.system_info import CompactSystemInfo
-from dashboard.widgets.services import ServicesTab
 from dashboard.widgets.containers import ContainersTab
-from dashboard.widgets.processes import ProcessesTab
-from dashboard.widgets.users import UsersTab
-from dashboard.widgets.network import NetworkExtendedTab
-from dashboard.widgets.tasks import TasksExtendedTab
-from dashboard.widgets.logging import LoggingTab
-from dashboard.widgets.packages import PackagesTab
 from dashboard.widgets.disks import DisksTab
+from dashboard.widgets.logging import LoggingTab
+from dashboard.widgets.network import NetworkExtendedTab
+from dashboard.widgets.packages import PackagesTab
+from dashboard.widgets.processes import ProcessesTab
+from dashboard.widgets.services import ServicesTab
+from dashboard.widgets.system_info import CompactSystemInfo
+from dashboard.widgets.tasks import TasksExtendedTab
+from dashboard.widgets.users import UsersTab
 from utils.logger import get_logger
 
 logger = get_logger("dashboard")

@@ -1,10 +1,13 @@
 """Processes collector."""
 
-import psutil
 import datetime
-from typing import Dict, Any, List
-from .base import BaseCollector
+from typing import Any, Dict, List
+
+import psutil
+
 from utils.logger import get_logger
+
+from .base import BaseCollector
 
 logger = get_logger("processes_collector")
 

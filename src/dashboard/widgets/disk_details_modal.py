@@ -1,17 +1,18 @@
 """Disk details modal showing extended information."""
 
-import subprocess
 import json
 import os
-from textual.app import ComposeResult
-from textual.containers import Vertical, Horizontal
-from textual.screen import ModalScreen
-from textual.widgets import Static, Button, Label
+import subprocess
+from typing import Any, Dict, Optional
+
+from rich.console import Group
+from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich.panel import Panel
-from rich.console import Group
-from typing import Dict, Any, Optional
+from textual.app import ComposeResult
+from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
+from textual.widgets import Button, Label, Static
 
 from utils.logger import get_logger
 

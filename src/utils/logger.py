@@ -1,11 +1,13 @@
 """Logging configuration for the dashboard."""
 
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import sys
 import traceback
-from const import LOGGER_PREFIX, LOG_FILE
+from logging.handlers import RotatingFileHandler
+
+from const import LOG_FILE, LOGGER_PREFIX
+
 
 def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
     """

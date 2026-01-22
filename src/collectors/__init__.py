@@ -1,12 +1,12 @@
 """Collectors package for gathering system information."""
 
 from .base import BaseCollector
-from .system import SystemCollector
-from .services import ServicesCollector
 from .network import NetworkCollector
+from .processes import ProcessesCollector
+from .services import ServicesCollector
+from .system import SystemCollector
 from .tasks import TasksCollector
 from .users import UsersCollector
-from .processes import ProcessesCollector
 
 __all__ = [
     'BaseCollector',

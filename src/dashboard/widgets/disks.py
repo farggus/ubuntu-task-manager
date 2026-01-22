@@ -1,17 +1,19 @@
 """Disk usage tab widget with lsblk-style hierarchy display."""
 
+from typing import Any, Dict, List
+
+from rich.text import Text
 from textual import work
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Label, Static
-from textual.binding import Binding
-from rich.text import Text
-from typing import Dict, Any, List
 
 from collectors import SystemCollector
 from utils.logger import get_logger
-from utils.ui_helpers import update_table_preserving_scroll, bytes_to_human_readable
-from .smart_modal import SmartModal
+from utils.ui_helpers import bytes_to_human_readable, update_table_preserving_scroll
+
 from .fstab_modal import FstabModal
+from .smart_modal import SmartModal
 
 logger = get_logger("disks_tab")
 

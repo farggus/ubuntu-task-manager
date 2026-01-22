@@ -1,12 +1,15 @@
 """Network information collector."""
 
-import subprocess
-import shlex
-import psutil
 import ipaddress
-from typing import Dict, Any, List, Optional
-from .base import BaseCollector
+import shlex
+import subprocess
+from typing import Any, Dict, List, Optional
+
+import psutil
+
 from utils.logger import get_logger
+
+from .base import BaseCollector
 
 logger = get_logger("network_collector")
 
@@ -33,6 +36,7 @@ class NetworkCollector(BaseCollector):
         """Load bans database from disk."""
         import json
         import os
+
         from const import BANS_DB_FILE
         
         if os.path.exists(BANS_DB_FILE):
@@ -46,6 +50,7 @@ class NetworkCollector(BaseCollector):
     def _save_bans_db(self) -> None:
         """Save bans database to disk."""
         import json
+
         from const import BANS_DB_FILE
         try:
             with open(BANS_DB_FILE, 'w', encoding='utf-8') as f:
@@ -579,10 +584,10 @@ class NetworkCollector(BaseCollector):
 
     def _get_ip_data(self, ip: str) -> Dict[str, Any]:
         """Get IP data (Geo, attempts) from DB or fetch/calc it."""
+        import json
         import os
         import time
         import urllib.request
-        import json
 
         # Default info structure
         info = {

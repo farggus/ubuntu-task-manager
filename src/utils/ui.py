@@ -2,6 +2,7 @@
 
 from typing import List
 
+
 def generate_braille_sparkline(data_list: List[float], width: int = 25, max_val: float = 0.0) -> str:
     """Generate a smooth Braille-based sparkline string."""
     if not data_list:

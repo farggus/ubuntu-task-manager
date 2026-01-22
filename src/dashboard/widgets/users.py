@@ -2,12 +2,13 @@
 
 import os
 import signal
+from typing import Any, Dict
+
+from rich.text import Text
 from textual import work
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Label, Static
-from rich.text import Text
-from typing import Dict, Any
 
 from collectors import UsersCollector
 from utils.logger import get_logger

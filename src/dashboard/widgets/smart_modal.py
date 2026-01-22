@@ -1,13 +1,14 @@
 """Modal screen for displaying SMART report."""
 
+import os
+import shlex
+import subprocess
+
+from rich.markup import escape
+from textual import work
+from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import RichLog, Static
-from textual.containers import Vertical
-from textual import work
-from rich.markup import escape
-import subprocess
-import shlex
-import os
 
 from utils.logger import get_logger
 

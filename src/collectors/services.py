@@ -1,10 +1,12 @@
 """Services collector for systemd and Docker."""
 
-import subprocess
 import shlex
-from typing import Dict, Any, List, Optional
-from .base import BaseCollector
+import subprocess
+from typing import Any, Dict, List, Optional
+
 from utils.logger import get_logger
+
+from .base import BaseCollector
 
 logger = get_logger("services_collector")
 

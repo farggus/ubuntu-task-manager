@@ -1,10 +1,13 @@
 """Logging tab widget."""
 
+import os
+
 from textual import work
 from textual.containers import Vertical
-from textual.widgets import RichLog, Label
+from textual.widgets import Label, RichLog
+
 from const import LOG_FILE
-import os
+
 
 class LoggingTab(Vertical):
     """Tab displaying application logs."""

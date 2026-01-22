@@ -5,24 +5,26 @@ A TUI dashboard for monitoring and managing Ubuntu server configuration.
 """
 
 import argparse
-import sys
 import logging
 import os
+import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Ensure src is in python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from const import APP_NAME, APP_VERSION, LOGGER_PREFIX, DEFAULT_CONFIG
-from utils.logger import setup_logging, setup_exception_logging
+from const import APP_NAME, APP_VERSION, DEFAULT_CONFIG, LOGGER_PREFIX
 from dashboard import UTMDashboard
+from utils.logger import setup_exception_logging, setup_logging
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Initialize Sentry for error tracking
 import sentry_sdk
+
 if os.getenv("SENTRY_DSN"):
     sentry_sdk.init(
         dsn=os.getenv("SENTRY_DSN"),
