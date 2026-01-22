@@ -432,6 +432,57 @@ class NetworkExtendedTab(Vertical):
                     filter_failures = jail.get('filter_failures', 0)
                     banned_ips = jail.get('banned_ips', [])
 
+                    # Special handling for HISTORY
+                    if name == 'HISTORY':
+                        # 1. Separator row
+                        t.add_row("", "", "", "", "", "", "", "", "")
+                        
+                        # 2. Section Header Row (acting as custom headers for this section)
+                        t.add_row(
+                            Text("HISTORY", style="bold blue"),
+                            Text("Jail", style="bold"),
+                            Text("Banned IP", style="bold"),
+                            Text("Country", style="bold"),
+                            Text("Org", style="bold"),
+                            Text("Attempts", style="bold"),
+                            Text("Unbanned:", style="bold"),
+                            "", "" # Banned and Fail columns empty
+                        )
+                        
+                        for idx, ip_info in enumerate(banned_ips):
+                            ip_str = ip_info.get('ip', '?')
+                            country = ip_info.get('country', 'Unknown')
+                            org = ip_info.get('org', '-')
+                            if len(org) > 20: org = org[:17] + '...'
+                            attempts = ip_info.get('attempts', 0)
+                            unban_time = ip_info.get('unban_time', '')
+                            jail_origin = ip_info.get('jail', '?')
+                            
+                            # First column: Total count on first row, then empty
+                            col1 = Text(f"Total: {total_banned}", style="blue") if idx == 0 else ""
+                            
+                            # Second column: Original jail name
+                            jail_status_display = Text(f"[{jail_origin}]", style="blue")
+                            
+                            # Attempts coloring
+                            attempts_text = Text(str(attempts))
+                            if attempts >= 100: attempts_text.style = "bold red"
+                            elif attempts >= 20: attempts_text.style = "yellow"
+
+                            t.add_row(
+                                col1,
+                                jail_status_display,
+                                Text(ip_str, style="red"),
+                                country,
+                                org,
+                                attempts_text,
+                                unban_time, # Displays in "Ban For" column
+                                "", # Banned col empty
+                                ""  # Fail col empty
+                            )
+                        continue
+
+                    # Standard Logic for Active Jails
                     # Status based on currently banned
                     if currently_banned > 0:
                         status_text = Text("ACTIVE", style="bold red")
@@ -459,23 +510,20 @@ class NetworkExtendedTab(Vertical):
                         ip_str = first_ip.get('ip', '?') if isinstance(first_ip, dict) else str(first_ip)
                         country = first_ip.get('country', 'Unknown') if isinstance(first_ip, dict) else 'Unknown'
                         org = first_ip.get('org', '-') if isinstance(first_ip, dict) else '-'
-                        # Truncate org name if too long
                         if len(org) > 20:
                             org = org[:17] + '...'
                         attempts = first_ip.get('attempts', 0) if isinstance(first_ip, dict) else 0
                         bantime = first_ip.get('bantime', 0) if isinstance(first_ip, dict) else 0
+                        
+                        jail_display = Text(name, style="bold")
                         ban_for = self._format_bantime(bantime)
-
-                        # Color attempts based on count
-                        if attempts >= 100:
-                            attempts_text = Text(str(attempts), style="bold red")
-                        elif attempts >= 20:
-                            attempts_text = Text(str(attempts), style="yellow")
-                        else:
-                            attempts_text = Text(str(attempts))
+                        
+                        attempts_text = Text(str(attempts))
+                        if attempts >= 100: attempts_text.style = "bold red"
+                        elif attempts >= 20: attempts_text.style = "yellow"
 
                         t.add_row(
-                            Text(name, style="bold"),
+                            jail_display,
                             status_text,
                             Text(ip_str, style="red"),
                             country,
@@ -495,15 +543,11 @@ class NetworkExtendedTab(Vertical):
                                 org = org[:17] + '...'
                             attempts = ip_info.get('attempts', 0) if isinstance(ip_info, dict) else 0
                             bantime = ip_info.get('bantime', 0) if isinstance(ip_info, dict) else 0
+                            
                             ban_for = self._format_bantime(bantime)
-
-                            # Color attempts
-                            if attempts >= 100:
-                                attempts_text = Text(str(attempts), style="bold red")
-                            elif attempts >= 20:
-                                attempts_text = Text(str(attempts), style="yellow")
-                            else:
-                                attempts_text = Text(str(attempts))
+                            attempts_text = Text(str(attempts))
+                            if attempts >= 100: attempts_text.style = "bold red"
+                            elif attempts >= 20: attempts_text.style = "yellow"
 
                             t.add_row(
                                 "",  # Empty jail name

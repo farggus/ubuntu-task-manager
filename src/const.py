@@ -16,7 +16,7 @@ CONFIG_DIR = BASE_DIR / "config"
 DEFAULT_CONFIG = str(CONFIG_DIR / "config.yaml")
 
 CACHE_DIR = BASE_DIR / "cache"
-IP_CACHE_FILE = str(CACHE_DIR / "ip_geo_cache.json")
+BANS_DB_FILE = str(CACHE_DIR / "bans_db.json")
 
 # Ensure directories exist
 os.makedirs(LOG_DIR, exist_ok=True)

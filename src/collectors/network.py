@@ -15,31 +15,31 @@ class NetworkCollector(BaseCollector):
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
-        self.ip_cache = self._load_ip_cache()
+        self.bans_db = self._load_bans_db()
 
-    def _load_ip_cache(self) -> Dict[str, Dict[str, str]]:
-        """Load IP geo cache from disk."""
+    def _load_bans_db(self) -> Dict[str, Any]:
+        """Load bans database from disk."""
         import json
         import os
-        from const import IP_CACHE_FILE
+        from const import BANS_DB_FILE
         
-        if os.path.exists(IP_CACHE_FILE):
+        if os.path.exists(BANS_DB_FILE):
             try:
-                with open(IP_CACHE_FILE, 'r', encoding='utf-8') as f:
+                with open(BANS_DB_FILE, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception as e:
-                logger.error(f"Failed to load IP cache: {e}")
+                logger.error(f"Failed to load bans DB: {e}")
         return {}
 
-    def _save_ip_cache(self) -> None:
-        """Save IP geo cache to disk."""
+    def _save_bans_db(self) -> None:
+        """Save bans database to disk."""
         import json
-        from const import IP_CACHE_FILE
+        from const import BANS_DB_FILE
         try:
-            with open(IP_CACHE_FILE, 'w', encoding='utf-8') as f:
-                json.dump(self.ip_cache, f, indent=2)
+            with open(BANS_DB_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.bans_db, f, indent=2)
         except Exception as e:
-            logger.error(f"Failed to save IP cache: {e}")
+            logger.error(f"Failed to save bans DB: {e}")
 
     def collect(self) -> Dict[str, Any]:
         """
@@ -325,13 +325,23 @@ class NetworkCollector(BaseCollector):
 
             # Get detailed info for each jail
             total_banned = 0
+            active_ips = set()
             for jail_name in jail_names:
                 jail_info = self._get_jail_info(jail_name)
                 if jail_info:
                     result['jails'].append(jail_info)
                     total_banned += jail_info.get('currently_banned', 0)
+                    # Collect all active IPs
+                    for b_ip in jail_info.get('banned_ips', []):
+                        if b_ip.get('ip'):
+                            active_ips.add(b_ip['ip'])
 
             result['total_banned'] = total_banned
+
+            # Add Unbanned History (filtering out active IPs)
+            unbans_jail = self._get_recent_unbans(exclude_ips=active_ips)
+            if unbans_jail:
+                result['jails'].append(unbans_jail)
 
         except FileNotFoundError:
             logger.debug("fail2ban-client not found")
@@ -341,6 +351,87 @@ class NetworkCollector(BaseCollector):
             logger.error(f"Error getting fail2ban status: {e}")
 
         return result
+
+    def _get_recent_unbans(self, limit: int = 50, exclude_ips: set = None) -> Dict[str, Any]:
+        """Get recently unbanned IPs from fail2ban log, excluding active ones."""
+        import os
+        import subprocess
+        log_file = '/var/log/fail2ban.log'
+        unbans = []
+        exclude_ips = exclude_ips or set()
+        
+        if not os.path.exists(log_file):
+            return None
+
+        try:
+            # Grep "Unban" from log, take more to account for filtering
+            cmd = f"grep 'Unban' {log_file} | tail -n {limit * 3}"
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True, timeout=5
+            )
+            
+            processed_ips = set()
+
+            # Parse lines: "2023-10-27 10:00:00,123 fail2ban.actions [123]: NOTICE [sshd] Unban 1.2.3.4"
+            for line in reversed(result.stdout.splitlines()): # Show newest first
+                if len(unbans) >= limit:
+                    break
+
+                parts = line.split()
+                # Expected minimal parts: Date, Time, ..., Jail, Unban, IP
+                if len(parts) >= 6:
+                    ip = parts[-1]
+                    
+                    # Filter: Skip if currently banned OR already added to this list
+                    if ip in exclude_ips or ip in processed_ips:
+                        continue
+
+                    jail = 'unknown'
+                    try:
+                        # Find 'Unban' index
+                        if 'Unban' in parts:
+                            unban_idx = parts.index('Unban')
+                            # Look backwards for [jail]
+                            for i in range(unban_idx - 1, -1, -1):
+                                if parts[i].startswith('[') and parts[i].endswith(']'):
+                                    jail = parts[i].strip('[]')
+                                    break
+                    except (ValueError, IndexError):
+                        pass
+                        
+                    timestamp = f"{parts[0]} {parts[1]}"
+                    
+                    # Enrich with geo info and attempts from DB
+                    ip_data = self._get_ip_data(ip)
+                    
+                    unbans.append({
+                        'ip': ip,
+                        'country': ip_data.get('country', 'Unknown'),
+                        'org': ip_data.get('org', 'Unknown'),
+                        'jail': jail, # Store original jail name here
+                        'unban_time': timestamp,
+                        'attempts': ip_data.get('attempts', 0), 
+                        'bantime': 0
+                    })
+                    processed_ips.add(ip)
+            
+            if not unbans:
+                return None
+
+            # Sort by attempts descending
+            unbans.sort(key=lambda x: x.get('attempts', 0), reverse=True)
+
+            return {
+                'name': 'HISTORY',
+                'currently_banned': 0,
+                'total_banned': len(unbans),
+                'banned_ips': unbans,
+                'filter_failures': 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get unbans: {e}")
+            return None
 
     def _get_jail_info(self, jail_name: str) -> Dict[str, Any]:
         """Get detailed information about a specific fail2ban jail."""
@@ -384,12 +475,12 @@ class NetworkCollector(BaseCollector):
                         is_traefik = 'traefik' in jail_name.lower()
                         jail_info['banned_ips'] = []
                         for ip in ips:
-                            # Get country and org in one call
-                            geo_info = self._get_ip_info(ip)
+                            # Get country and org from DB
+                            ip_data = self._get_ip_data(ip)
                             ip_info = {
                                 'ip': ip,
-                                'country': geo_info.get('country', 'Unknown'),
-                                'org': geo_info.get('org', 'Unknown'),
+                                'country': ip_data.get('country', 'Unknown'),
+                                'org': ip_data.get('org', 'Unknown'),
                                 'attempts': self._count_ip_attempts(ip, jail_name),
                                 'bantime': bantime,
                             }
@@ -457,33 +548,60 @@ class NetworkCollector(BaseCollector):
         except Exception:
             return 0
 
-    def _get_ip_info(self, ip: str) -> Dict[str, str]:
-        """Get country and organization for an IP address using ip-api.com."""
-        if ip in self.ip_cache:
-            return self.ip_cache[ip]
+    def _get_ip_data(self, ip: str) -> Dict[str, Any]:
+        """Get IP data (Geo, attempts) from DB or fetch/calc it."""
+        import os
+        import subprocess
+        import time
+        import urllib.request
+        import json
+        
+        # Default info structure
+        info = {
+            'country': 'Unknown',
+            'org': 'Unknown',
+            'attempts': 0,
+            'last_updated': 0
+        }
 
-        try:
-            import urllib.request
-            import json
+        # Check cache/DB
+        if ip in self.bans_db:
+            info = self.bans_db[ip]
 
-            url = f"http://ip-api.com/json/{ip}?fields=country,org"
-            req = urllib.request.Request(url, headers={'User-Agent': 'utm'})
+        current_time = time.time()
+        # Update if it's new OR if entry is older than 5 minutes (300 seconds)
+        if current_time - info.get('last_updated', 0) > 300:
+            
+            # 1. Geo Info (Only if unknown or missing)
+            if info.get('country', 'Unknown') == 'Unknown':
+                try:
+                    url = f"http://ip-api.com/json/{ip}?fields=country,org"
+                    req = urllib.request.Request(url, headers={'User-Agent': 'utm'})
+                    with urllib.request.urlopen(req, timeout=2) as response:
+                        data = json.loads(response.read().decode())
+                        info['country'] = data.get('country', 'Unknown')
+                        info['org'] = data.get('org', 'Unknown')
+                except Exception:
+                    pass
 
-            with urllib.request.urlopen(req, timeout=2) as response:
-                data = json.loads(response.read().decode())
-                info = {
-                    'country': data.get('country', 'Unknown'),
-                    'org': data.get('org', 'Unknown')
-                }
-                self.ip_cache[ip] = info
-                self._save_ip_cache()
-                return info
-        except Exception:
-            return {'country': 'Unknown', 'org': 'Unknown'}
+            # 2. Count attempts (Update count from log)
+            try:
+                log_file = '/var/log/fail2ban.log'
+                if os.path.exists(log_file):
+                    count_res = subprocess.run(
+                        ['grep', '-c', ip, log_file],
+                        capture_output=True, text=True, timeout=2
+                    )
+                    if count_res.returncode == 0:
+                        info['attempts'] = int(count_res.stdout.strip())
+            except Exception:
+                pass
 
-    def _get_ip_country(self, ip: str) -> str:
-        """Get country name for an IP address (legacy wrapper)."""
-        return self._get_ip_info(ip).get('country', 'Unknown')
+            info['last_updated'] = current_time
+            self.bans_db[ip] = info
+            self._save_bans_db()
+            
+        return info
 
     def _get_traefik_target_for_ip(self, ip: str, log_path: str = '/home/app_data/docker/traefik/logs/access.log') -> str:
         """Get target application/path from Traefik JSON log for a given IP."""
