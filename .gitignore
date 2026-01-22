@@ -38,3 +38,4 @@ Thumbs.db
 custom_scripts/
 *.log
 /.gemini
+/cache
