@@ -14,6 +14,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Static
 
+from utils.binaries import LSBLK, SMARTCTL, SUDO
 from utils.logger import get_logger
 
 logger = get_logger("disk_details_modal")
@@ -175,9 +176,9 @@ class DiskDetailsModal(ModalScreen):
             return {}
 
         try:
-            cmd = ['smartctl', '-A', '-H', '-j', device]
+            cmd = [SMARTCTL, '-A', '-H', '-j', device]
             if os.geteuid() != 0:
-                cmd = ['sudo'] + cmd
+                cmd = [SUDO] + cmd
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if not result.stdout:
@@ -247,7 +248,7 @@ class DiskDetailsModal(ModalScreen):
 
         try:
             result = subprocess.run(
-                ['lsblk', '-o', 'LABEL', '-n', device],
+                [LSBLK, '-o', 'LABEL', '-n', device],
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:
@@ -265,7 +266,7 @@ class DiskDetailsModal(ModalScreen):
 
         try:
             result = subprocess.run(
-                ['lsblk', '-o', 'PTTYPE', '-n', device],
+                [LSBLK, '-o', 'PTTYPE', '-n', device],
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:

@@ -10,6 +10,7 @@ from textual.containers import Vertical
 from textual.widgets import DataTable, Label, Static
 
 from collectors import ServicesCollector
+from utils.binaries import SUDO, SYSTEMCTL
 from utils.logger import get_logger
 from utils.ui_helpers import update_table_preserving_scroll
 
@@ -107,7 +108,7 @@ class ServicesTab(Vertical):
              return
 
         try:
-            cmd = ["sudo", "systemctl", action, service_name]
+            cmd = [SUDO, SYSTEMCTL, action, service_name]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0:

@@ -10,6 +10,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static, TextArea
 
+from utils.binaries import CP, SUDO
 from utils.logger import get_logger
 
 logger = get_logger("fstab_modal")
@@ -141,7 +142,7 @@ class FstabModal(ModalScreen):
                 try:
                     # Backup original
                     result = subprocess.run(
-                        ['sudo', 'cp', '/etc/fstab', backup_path],
+                        [SUDO, CP, '/etc/fstab', backup_path],
                         capture_output=True, text=True, timeout=10
                     )
                     if result.returncode != 0:
@@ -149,7 +150,7 @@ class FstabModal(ModalScreen):
 
                     # Copy new content
                     result = subprocess.run(
-                        ['sudo', 'cp', tmp_path, '/etc/fstab'],
+                        [SUDO, CP, tmp_path, '/etc/fstab'],
                         capture_output=True, text=True, timeout=10
                     )
                     if result.returncode != 0:

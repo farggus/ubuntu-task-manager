@@ -4,6 +4,7 @@ import shlex
 import subprocess
 from typing import Any, Dict, List, Optional
 
+from utils.binaries import PS, SYSTEMCTL
 from utils.logger import get_logger
 
 from .base import BaseCollector
@@ -57,9 +58,8 @@ class ServicesCollector(BaseCollector):
         user_map = {}
         try:
             # List unit and user for all processes
-            cmd = "ps -eo unit,user --no-headers"
             result = subprocess.run(
-                shlex.split(cmd),
+                [PS, '-eo', 'unit,user', '--no-headers'],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -89,9 +89,8 @@ class ServicesCollector(BaseCollector):
             # Get users mapping first
             users_map = self._get_service_users_map()
             
-            cmd = "systemctl list-units --type=service --all --no-pager --no-legend"
             result = subprocess.run(
-                shlex.split(cmd),
+                [SYSTEMCTL, 'list-units', '--type=service', '--all', '--no-pager', '--no-legend'],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -141,9 +140,8 @@ class ServicesCollector(BaseCollector):
             if not service_name.endswith('.service'):
                 service_name += '.service'
 
-            cmd = f"systemctl show {service_name} --no-pager"
             result = subprocess.run(
-                shlex.split(cmd),
+                [SYSTEMCTL, 'show', service_name, '--no-pager'],
                 capture_output=True,
                 text=True,
                 timeout=5

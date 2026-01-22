@@ -10,6 +10,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import RichLog, Static
 
+from utils.binaries import SMARTCTL, SUDO, WHICH
 from utils.logger import get_logger
 
 logger = get_logger("smart_modal")
@@ -62,7 +63,7 @@ This may take a moment.[/dim]""")
         log_view = self.query_one(RichLog)
 
         # Check if smartctl is installed
-        if subprocess.run(['which', 'smartctl'], capture_output=True).returncode != 0:
+        if subprocess.run([WHICH, 'smartctl'], capture_output=True).returncode != 0:
             self.app.call_from_thread(log_view.write, "[bold red]Error: `smartctl` command not found. Please install `smartmontools`.[/bold red]")
             return
 
@@ -88,9 +89,9 @@ This may take a moment.[/dim]""")
         """Try to run smartctl with optional device type."""
         try:
             if os.geteuid() == 0:
-                cmd = ["smartctl", "-a"]
+                cmd = [SMARTCTL, "-a"]
             else:
-                cmd = ["sudo", "smartctl", "-a"]
+                cmd = [SUDO, SMARTCTL, "-a"]
 
             if device_type:
                 cmd.extend(["-d", device_type])

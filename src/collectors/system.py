@@ -14,6 +14,7 @@ from typing import Any, Dict
 
 import psutil
 
+from utils.binaries import APT, DPKG_QUERY, LSBLK, SMARTCTL, SUDO, SYSTEMCTL
 from utils.logger import get_logger
 
 from .base import BaseCollector
@@ -67,7 +68,7 @@ class SystemCollector(BaseCollector):
         try:
             # 1. Get all installed packages (fast)
             res_total = subprocess.run(
-                ['dpkg-query', '-W', '-f=${Package} ${Version}\n'],
+                [DPKG_QUERY, '-W', '-f=${Package} ${Version}\n'],
                 capture_output=True, text=True, timeout=5
             )
             if res_total.returncode == 0:
@@ -84,7 +85,7 @@ class SystemCollector(BaseCollector):
 
             # 2. Get list of upgradable packages using apt list --upgradable
             res_list = subprocess.run(
-                ['apt', 'list', '--upgradable'],
+                [APT, 'list', '--upgradable'],
                 capture_output=True, text=True, timeout=10
             )
             
@@ -179,7 +180,7 @@ class SystemCollector(BaseCollector):
             # actually --count prints a summary at end, without it it prints lines.
             
             result = subprocess.run(
-                shlex.split("systemctl list-units --state=failed --no-legend"),
+                [SYSTEMCTL, 'list-units', '--state=failed', '--no-legend'],
                 capture_output=True,
                 text=True,
                 timeout=2
@@ -190,7 +191,7 @@ class SystemCollector(BaseCollector):
             # For total services, we can get active ones quickly
             # systemctl list-units --type=service --no-legend
             res_total = subprocess.run(
-                shlex.split("systemctl list-units --type=service --state=active --no-legend"),
+                [SYSTEMCTL, 'list-units', '--type=service', '--state=active', '--no-legend'],
                 capture_output=True,
                 text=True,
                 timeout=2
@@ -322,7 +323,7 @@ class SystemCollector(BaseCollector):
         disk_info_map = {}
         try:
             result = subprocess.run(
-                ['lsblk', '-o', 'NAME,VENDOR,MODEL,SERIAL,ROTA,TYPE,SIZE,TRAN,UUID,FSTYPE', '-J', '-b'],
+                [LSBLK, '-o', 'NAME,VENDOR,MODEL,SERIAL,ROTA,TYPE,SIZE,TRAN,UUID,FSTYPE', '-J', '-b'],
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:
@@ -581,13 +582,13 @@ class SystemCollector(BaseCollector):
     def _try_smartctl_json(self, disk_name: str, device_type: str = None) -> Dict[str, Any]:
         """Try to get SMART info via smartctl JSON output."""
         try:
-            cmd = ['smartctl', '-H', '-A', '-j']
+            cmd = [SMARTCTL, '-H', '-A', '-j']
             if device_type:
                 cmd.extend(['-d', device_type])
             cmd.append(disk_name)
 
             if os.geteuid() != 0:
-                cmd = ['sudo'] + cmd
+                cmd = [SUDO] + cmd
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 

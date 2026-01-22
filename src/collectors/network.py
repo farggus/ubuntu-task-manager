@@ -7,6 +7,15 @@ from typing import Any, Dict, List, Optional
 
 import psutil
 
+from utils.binaries import (
+    FAIL2BAN_CLIENT,
+    FIREWALL_CMD,
+    GREP,
+    IP,
+    IPTABLES,
+    TAIL,
+    UFW,
+)
 from utils.logger import get_logger
 
 from .base import BaseCollector
@@ -221,7 +230,7 @@ class NetworkCollector(BaseCollector):
         """Check UFW firewall status."""
         try:
             result = subprocess.run(
-                shlex.split("ufw status numbered"),
+                [UFW, 'status', 'numbered'],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -250,7 +259,7 @@ class NetworkCollector(BaseCollector):
         """Check firewalld status."""
         try:
             result = subprocess.run(
-                shlex.split("firewall-cmd --state"),
+                [FIREWALL_CMD, '--state'],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -271,7 +280,7 @@ class NetworkCollector(BaseCollector):
         """Check iptables rules."""
         try:
             result = subprocess.run(
-                shlex.split("iptables -L -n"),
+                [IPTABLES, '-L', '-n'],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -292,7 +301,7 @@ class NetworkCollector(BaseCollector):
         """Get routing table."""
         try:
             result = subprocess.run(
-                shlex.split("ip route show"),
+                [IP, 'route', 'show'],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -318,7 +327,7 @@ class NetworkCollector(BaseCollector):
         try:
             # Check if fail2ban-client exists and get status
             status_result = subprocess.run(
-                ['fail2ban-client', 'status'],
+                [FAIL2BAN_CLIENT, 'status'],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -457,7 +466,7 @@ class NetworkCollector(BaseCollector):
         """Get detailed information about a specific fail2ban jail."""
         try:
             result = subprocess.run(
-                ['fail2ban-client', 'status', jail_name],
+                [FAIL2BAN_CLIENT, 'status', jail_name],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -525,7 +534,7 @@ class NetworkCollector(BaseCollector):
         """Get bantime for a jail in seconds."""
         try:
             result = subprocess.run(
-                ['fail2ban-client', 'get', jail_name, 'bantime'],
+                [FAIL2BAN_CLIENT, 'get', jail_name, 'bantime'],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -551,7 +560,7 @@ class NetworkCollector(BaseCollector):
             if jail_name == 'sshd':
                 log_file = '/var/log/auth.log'
                 result = subprocess.run(
-                    ['grep', '-c', ip, log_file],
+                    [GREP, '-c', ip, log_file],
                     capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0:
@@ -559,7 +568,7 @@ class NetworkCollector(BaseCollector):
             elif jail_name == 'traefik-botsearch':
                 log_file = '/home/app_data/docker/traefik/logs/access.log'
                 result = subprocess.run(
-                    ['grep', '-c', ip, log_file],
+                    [GREP, '-c', ip, log_file],
                     capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0:
@@ -652,7 +661,7 @@ class NetworkCollector(BaseCollector):
         try:
             # Read last 1000 lines of log to find requests from this IP
             result = subprocess.run(
-                ['tail', '-1000', log_path],
+                [TAIL, '-1000', log_path],
                 capture_output=True,
                 text=True,
                 timeout=5

@@ -11,6 +11,7 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Button, DataTable, Label, Static
 
 from collectors import SystemCollector
+from utils.binaries import APT_GET, SUDO
 from utils.logger import get_logger
 from utils.ui_helpers import update_table_preserving_scroll
 
@@ -123,7 +124,7 @@ class PackagesTab(Vertical):
             pkg_name = str(pkg_name_cell).split()[0]
 
             self.notify(f"Updating {pkg_name}...", severity="information")
-            self.run_update_command(["sudo", "apt-get", "install", "--only-upgrade", "-y", pkg_name])
+            self.run_update_command([SUDO, APT_GET, "install", "--only-upgrade", "-y", pkg_name])
         except Exception as e:
             logger.error(f"Error selecting package for update: {e}")
             self.notify("Error selecting package", severity="error")
@@ -134,7 +135,7 @@ class PackagesTab(Vertical):
     def action_update_all(self) -> None:
         """Update all packages."""
         self.notify("Starting full system upgrade...", severity="warning")
-        self.run_update_command(["sudo", "apt-get", "upgrade", "-y"])
+        self.run_update_command([SUDO, APT_GET, "upgrade", "-y"])
 
     @work(thread=True)
     def run_update_command(self, cmd: list) -> None:

@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from utils.binaries import CRONTAB, SYSTEMCTL
 from utils.logger import get_logger
 
 from .base import BaseCollector
@@ -100,7 +101,7 @@ class TasksCollector(BaseCollector):
         """Get crontab for a specific user."""
         try:
             result = subprocess.run(
-                ['crontab', '-l', '-u', username],
+                [CRONTAB, '-l', '-u', username],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -442,7 +443,7 @@ class TasksCollector(BaseCollector):
         try:
             # Get active timers
             result = subprocess.run(
-                shlex.split("systemctl list-timers --all --no-pager --no-legend"),
+                [SYSTEMCTL, 'list-timers', '--all', '--no-pager', '--no-legend'],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -474,7 +475,7 @@ class TasksCollector(BaseCollector):
 
             # Get all timer unit files with details
             timer_list_result = subprocess.run(
-                shlex.split("systemctl list-unit-files --type=timer --no-pager --no-legend"),
+                [SYSTEMCTL, 'list-unit-files', '--type=timer', '--no-pager', '--no-legend'],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -489,7 +490,7 @@ class TasksCollector(BaseCollector):
 
                     # Get detailed info about this timer
                     show_result = subprocess.run(
-                        ['systemctl', 'show', timer_name, '--no-pager'],
+                        [SYSTEMCTL, 'show', timer_name, '--no-pager'],
                         capture_output=True,
                         text=True,
                         timeout=5

@@ -9,6 +9,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Static
 
+from utils.binaries import MKDIR, MOUNT, SUDO, UMOUNT
 from utils.logger import get_logger
 
 logger = get_logger("mount_modal")
@@ -122,9 +123,9 @@ class MountModal(ModalScreen):
         try:
             if self.action == 'unmount':
                 # Unmount
-                cmd = ['umount', self.mountpoint]
+                cmd = [UMOUNT, self.mountpoint]
                 if os.geteuid() != 0:
-                    cmd = ['sudo'] + cmd
+                    cmd = [SUDO] + cmd
 
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
@@ -150,15 +151,15 @@ class MountModal(ModalScreen):
 
                 # Create mountpoint if it doesn't exist
                 if not os.path.exists(mountpoint):
-                    mkdir_cmd = ['mkdir', '-p', mountpoint]
+                    mkdir_cmd = [MKDIR, '-p', mountpoint]
                     if os.geteuid() != 0:
-                        mkdir_cmd = ['sudo'] + mkdir_cmd
+                        mkdir_cmd = [SUDO] + mkdir_cmd
                     subprocess.run(mkdir_cmd, capture_output=True, timeout=10)
 
                 # Mount
-                cmd = ['mount', self.device, mountpoint]
+                cmd = [MOUNT, self.device, mountpoint]
                 if os.geteuid() != 0:
-                    cmd = ['sudo'] + cmd
+                    cmd = [SUDO] + cmd
 
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
