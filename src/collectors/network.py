@@ -378,7 +378,7 @@ class NetworkCollector(BaseCollector):
 
         return result
 
-    def _get_recent_unbans(self, limit: int = 50, exclude_ips: set = None) -> Dict[str, Any]:
+    def _get_recent_unbans(self, limit: int = 500, exclude_ips: set = None) -> Dict[str, Any]:
         """Get recently unbanned IPs from fail2ban log, excluding active ones."""
         import os
         log_file = '/var/log/fail2ban.log'
