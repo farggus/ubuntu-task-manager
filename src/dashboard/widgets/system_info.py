@@ -329,9 +329,9 @@ class CompactSystemInfo(Horizontal):
         total_procs = processes_info.get('total', 0)
         zombies = processes_info.get('zombies', 0)
         
-        proc_text = Text(f"{total_procs} ", style="white")
-        z_style = "bold red" if zombies > 0 else "green"
-        proc_text.append(f"({zombies} zombies)", style=z_style)
+        proc_text = Text(f"{total_procs}", style="white")
+        if zombies > 0:
+            proc_text.append(f" ({zombies} zombies)", style="bold red")
         table.add_row("Processes", proc_text)
 
         # Services
@@ -339,9 +339,9 @@ class CompactSystemInfo(Horizontal):
         active_svc = services_stats.get('active', 0)
         failed_svc = services_stats.get('failed', 0)
         
-        svc_text = Text(f"{active_svc} ", style="white")
-        f_style = "bold red" if failed_svc > 0 else "green"
-        svc_text.append(f"({failed_svc} failed)", style=f_style)
+        svc_text = Text(f"{active_svc}", style="white")
+        if failed_svc > 0:
+            svc_text.append(f" ({failed_svc} failed)", style="bold red")
         table.add_row("Services", svc_text)
 
         # Packages
@@ -349,9 +349,9 @@ class CompactSystemInfo(Horizontal):
         pkg_total = pkg_stats.get('total', 0)
         pkg_upd = pkg_stats.get('updates', 0)
         
-        pkg_text = Text(f"{pkg_total} ", style="white")
-        u_style = "bold red" if pkg_upd > 0 else "green"
-        pkg_text.append(f"({pkg_upd} updates available)", style=u_style)
+        pkg_text = Text(f"{pkg_total}", style="white")
+        if pkg_upd > 0:
+            pkg_text.append(f" ({pkg_upd} updates available)", style="bold red")
         table.add_row("Packages", pkg_text)
 
         return table

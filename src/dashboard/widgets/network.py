@@ -424,6 +424,21 @@ class NetworkExtendedTab(Vertical):
                 t.add_row("No jails configured", "", "", "", "", "", "", "", "")
                 return
 
+            # Sort Jails: OK first, then Active, then recidive, then HISTORY
+            def sort_jails(j):
+                name = j.get('name', '')
+                banned = j.get('currently_banned', 0)
+                
+                if name == 'HISTORY':
+                    return 3
+                if name == 'recidive':
+                    return 2
+                if banned > 0:
+                    return 1
+                return 0
+
+            jails.sort(key=sort_jails)
+
             for jail in jails:
                 try:
                     name = jail.get('name', 'N/A')
