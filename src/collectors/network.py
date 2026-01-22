@@ -3,11 +3,23 @@
 import subprocess
 import shlex
 import psutil
-from typing import Dict, Any, List
+import ipaddress
+from typing import Dict, Any, List, Optional
 from .base import BaseCollector
 from utils.logger import get_logger
 
 logger = get_logger("network_collector")
+
+
+def is_valid_ip(ip: str) -> bool:
+    """Validate IP address (IPv4 or IPv6) to prevent injection attacks."""
+    if not ip or not isinstance(ip, str):
+        return False
+    try:
+        ipaddress.ip_address(ip.strip())
+        return True
+    except ValueError:
+        return False
 
 
 class NetworkCollector(BaseCollector):
@@ -355,25 +367,28 @@ class NetworkCollector(BaseCollector):
     def _get_recent_unbans(self, limit: int = 50, exclude_ips: set = None) -> Dict[str, Any]:
         """Get recently unbanned IPs from fail2ban log, excluding active ones."""
         import os
-        import subprocess
         log_file = '/var/log/fail2ban.log'
         unbans = []
         exclude_ips = exclude_ips or set()
-        
+
         if not os.path.exists(log_file):
             return None
 
         try:
-            # Grep "Unban" from log, take more to account for filtering
-            cmd = f"grep 'Unban' {log_file} | tail -n {limit * 3}"
-            result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=5
-            )
-            
+            # Read file and filter lines containing 'Unban' (safe, no shell)
+            unban_lines = []
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    if 'Unban' in line:
+                        unban_lines.append(line.strip())
+
+            # Take last limit*3 lines (equivalent to tail)
+            unban_lines = unban_lines[-(limit * 3):]
+
             processed_ips = set()
 
             # Parse lines: "2023-10-27 10:00:00,123 fail2ban.actions [123]: NOTICE [sshd] Unban 1.2.3.4"
-            for line in reversed(result.stdout.splitlines()): # Show newest first
+            for line in reversed(unban_lines): # Show newest first
                 if len(unbans) >= limit:
                     break
 
@@ -518,44 +533,57 @@ class NetworkCollector(BaseCollector):
 
     def _count_ip_attempts(self, ip: str, jail_name: str) -> int:
         """Count failed attempts for an IP from logs based on jail type."""
+        import os
+        import re
+
+        # Validate IP to prevent injection
+        if not is_valid_ip(ip):
+            logger.warning(f"Invalid IP rejected in _count_ip_attempts: {ip}")
+            return 0
+
         try:
             # Determine log file and pattern based on jail
             if jail_name == 'sshd':
                 log_file = '/var/log/auth.log'
-                # Count Failed password and Invalid user entries
                 result = subprocess.run(
                     ['grep', '-c', ip, log_file],
                     capture_output=True, text=True, timeout=5
                 )
+                if result.returncode == 0:
+                    return int(result.stdout.strip())
             elif jail_name == 'traefik-botsearch':
                 log_file = '/home/app_data/docker/traefik/logs/access.log'
                 result = subprocess.run(
                     ['grep', '-c', ip, log_file],
                     capture_output=True, text=True, timeout=5
                 )
+                if result.returncode == 0:
+                    return int(result.stdout.strip())
             elif jail_name == 'openvpn':
                 log_file = '/var/log/syslog'
-                result = subprocess.run(
-                    f"grep 'ovpn-server.*{ip}' {log_file} | wc -l",
-                    shell=True, capture_output=True, text=True, timeout=5
-                )
-            else:
-                return 0
+                if not os.path.exists(log_file):
+                    return 0
+                # Use Python regex instead of shell grep (safe, no injection)
+                pattern = re.compile(rf'ovpn-server.*{re.escape(ip)}')
+                count = 0
+                with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    for line in f:
+                        if pattern.search(line):
+                            count += 1
+                return count
 
-            if result.returncode == 0:
-                return int(result.stdout.strip())
             return 0
-        except Exception:
+        except (ValueError, OSError, subprocess.TimeoutExpired) as e:
+            logger.debug(f"Error counting IP attempts for {ip}: {e}")
             return 0
 
     def _get_ip_data(self, ip: str) -> Dict[str, Any]:
         """Get IP data (Geo, attempts) from DB or fetch/calc it."""
         import os
-        import subprocess
         import time
         import urllib.request
         import json
-        
+
         # Default info structure
         info = {
             'country': 'Unknown',
@@ -564,6 +592,11 @@ class NetworkCollector(BaseCollector):
             'last_updated': 0
         }
 
+        # Validate IP before any operations (SSRF prevention)
+        if not is_valid_ip(ip):
+            logger.warning(f"Invalid IP address rejected: {ip}")
+            return info
+
         # Check cache/DB
         if ip in self.bans_db:
             info = self.bans_db[ip]
@@ -571,7 +604,7 @@ class NetworkCollector(BaseCollector):
         current_time = time.time()
         # Update if it's new OR if entry is older than 5 minutes (300 seconds)
         if current_time - info.get('last_updated', 0) > 300:
-            
+
             # 1. Geo Info (Only if unknown or missing)
             if info.get('country', 'Unknown') == 'Unknown':
                 try:
@@ -581,31 +614,35 @@ class NetworkCollector(BaseCollector):
                         data = json.loads(response.read().decode())
                         info['country'] = data.get('country', 'Unknown')
                         info['org'] = data.get('org', 'Unknown')
-                except Exception:
-                    pass
+                except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
+                    logger.debug(f"Failed to fetch geo data for {ip}: {e}")
 
-            # 2. Count attempts (Update count from log)
+            # 2. Count attempts (Update count from log using Python, not grep)
             try:
                 log_file = '/var/log/fail2ban.log'
                 if os.path.exists(log_file):
-                    count_res = subprocess.run(
-                        ['grep', '-c', ip, log_file],
-                        capture_output=True, text=True, timeout=2
-                    )
-                    if count_res.returncode == 0:
-                        info['attempts'] = int(count_res.stdout.strip())
-            except Exception:
-                pass
+                    count = 0
+                    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                        for line in f:
+                            if ip in line:
+                                count += 1
+                    info['attempts'] = count
+            except (OSError, IOError) as e:
+                logger.debug(f"Failed to count attempts for {ip}: {e}")
 
             info['last_updated'] = current_time
             self.bans_db[ip] = info
             self._save_bans_db()
-            
+
         return info
 
     def _get_traefik_target_for_ip(self, ip: str, log_path: str = '/home/app_data/docker/traefik/logs/access.log') -> str:
         """Get target application/path from Traefik JSON log for a given IP."""
         import json
+
+        # Validate IP
+        if not is_valid_ip(ip):
+            return '-'
 
         try:
             # Read last 1000 lines of log to find requests from this IP

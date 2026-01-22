@@ -107,6 +107,6 @@ class ProcessesCollector(BaseCollector):
                 summary['total'] += 1
                 if status in summary:
                     summary[status] += 1
-        except:
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
         return summary

@@ -64,8 +64,8 @@ class SystemCollector(BaseCollector):
         try:
             # 1. Get all installed packages (fast)
             res_total = subprocess.run(
-                "dpkg-query -W -f='${Package} ${Version}\n'",
-                shell=True, capture_output=True, text=True, timeout=5
+                ['dpkg-query', '-W', '-f=${Package} ${Version}\n'],
+                capture_output=True, text=True, timeout=5
             )
             if res_total.returncode == 0:
                 lines = res_total.stdout.splitlines()
@@ -81,8 +81,8 @@ class SystemCollector(BaseCollector):
 
             # 2. Get list of upgradable packages using apt list --upgradable
             res_list = subprocess.run(
-                "apt list --upgradable",
-                shell=True, capture_output=True, text=True, timeout=10
+                ['apt', 'list', '--upgradable'],
+                capture_output=True, text=True, timeout=10
             )
             
             if res_list.returncode == 0:
@@ -98,18 +98,18 @@ class SystemCollector(BaseCollector):
                         parts = line.split('/')
                         if len(parts) > 1:
                             pkg_name = parts[0]
-                            
+
                             # Extract new version (second word)
                             rest = line.split()
                             new_ver = rest[1] if len(rest) > 1 else '?'
-                            
+
                             upgradable_list.append({
-                                'name': pkg_name, 
+                                'name': pkg_name,
                                 'new_version': new_ver,
                                 'current_version': '?' # Placeholder
                             })
                             upgradable_names.append(pkg_name)
-                    except:
+                    except (IndexError, ValueError):
                         pass
                 
                 # Enhance with current versions using dpkg-query (reliable)
@@ -247,7 +247,7 @@ class SystemCollector(BaseCollector):
                     if entries:
                         temp = entries[0].current
                         break
-        except:
+        except (AttributeError, KeyError, OSError, IOError):
             pass
 
         return {
@@ -308,7 +308,7 @@ class SystemCollector(BaseCollector):
                     'free': usage.free,
                     'percent': round(usage.percent, 1),
                 }
-            except:
+            except (PermissionError, OSError, FileNotFoundError):
                 return None
 
         # Get SMART cache
@@ -703,16 +703,16 @@ class SystemCollector(BaseCollector):
                     if addr.address == ip:
                         interface = iface
                         break
-        except:
+        except (OSError, socket.error, AttributeError):
             pass
-            
+
         return {'ip': ip, 'interface': interface}
 
     def _get_users_count(self) -> int:
         """Get number of logged in users."""
         try:
             return len(psutil.users())
-        except:
+        except (psutil.AccessDenied, OSError):
             return 0
 
     def _get_process_stats(self) -> Dict[str, int]:
@@ -725,7 +725,7 @@ class SystemCollector(BaseCollector):
                 total += 1
                 if p.info['status'] == psutil.STATUS_ZOMBIE:
                     zombies += 1
-        except:
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
-            
+
         return {'total': total, 'zombies': zombies}
