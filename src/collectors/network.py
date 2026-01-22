@@ -573,6 +573,14 @@ class NetworkCollector(BaseCollector):
                 )
                 if result.returncode == 0:
                     return int(result.stdout.strip())
+            elif jail_name == 'recidive':
+                log_file = '/var/log/fail2ban.log'
+                result = subprocess.run(
+                    [GREP, '-c', ip, log_file],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    return int(result.stdout.strip())
             elif jail_name == 'openvpn':
                 log_file = '/var/log/syslog'
                 if not os.path.exists(log_file):

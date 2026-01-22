@@ -440,13 +440,17 @@ class NetworkExtendedTab(Vertical):
 
             jails.sort(key=sort_jails)
 
-            for jail in jails:
+            for idx, jail in enumerate(jails):
                 try:
                     name = jail.get('name', 'N/A')
                     currently_banned = jail.get('currently_banned', 0)
                     total_banned = jail.get('total_banned', 0)
                     filter_failures = jail.get('filter_failures', 0)
                     banned_ips = jail.get('banned_ips', [])
+
+                    # Add separator row between normal jails
+                    if idx > 0 and name != 'HISTORY':
+                        t.add_row("", "", "", "", "", "", "", "", "")
 
                     # Special handling for HISTORY
                     if name == 'HISTORY':
