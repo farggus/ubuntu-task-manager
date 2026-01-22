@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  utm:
+    build: .
+    image: ubuntu-task-manager:latest
+    container_name: utm
+    stdin_open: true
+    tty: true
+    pid: host
+    volumes:
+      # Docker socket for container monitoring
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # System logs for fail2ban monitoring
+      - /var/log:/var/log:ro
+      # Custom config (optional)
+      # - ./config/config.yaml:/app/config/config.yaml:ro
+    environment:
+      - TERM=xterm-256color
+      - LOG_DEST=stdout
+      - LOG_FORMAT=text
+    # For docker socket access
+    group_add:
+      - ${DOCKER_GID:-999}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.path.insert(0, 'src'); from collectors import system; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+# Usage:
+# 1. Get docker group ID: DOCKER_GID=$(getent group docker | cut -d: -f3)
+# 2. Run: DOCKER_GID=$DOCKER_GID docker-compose up -d
+# 3. Attach: docker attach utm
+# 4. Detach: Ctrl+P, Ctrl+Q
