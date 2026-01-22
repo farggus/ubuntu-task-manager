@@ -34,6 +34,11 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
 # Custom
 custom_scripts/
 *.log
