@@ -13,6 +13,34 @@ logger = get_logger("network_collector")
 class NetworkCollector(BaseCollector):
     """Collects network information (interfaces, ports, firewall)."""
 
+    def __init__(self, config: Dict[str, Any] = None):
+        super().__init__(config)
+        self.ip_cache = self._load_ip_cache()
+
+    def _load_ip_cache(self) -> Dict[str, Dict[str, str]]:
+        """Load IP geo cache from disk."""
+        import json
+        import os
+        from const import IP_CACHE_FILE
+        
+        if os.path.exists(IP_CACHE_FILE):
+            try:
+                with open(IP_CACHE_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load IP cache: {e}")
+        return {}
+
+    def _save_ip_cache(self) -> None:
+        """Save IP geo cache to disk."""
+        import json
+        from const import IP_CACHE_FILE
+        try:
+            with open(IP_CACHE_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.ip_cache, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save IP cache: {e}")
+
     def collect(self) -> Dict[str, Any]:
         """
         Collect network information.
@@ -431,6 +459,9 @@ class NetworkCollector(BaseCollector):
 
     def _get_ip_info(self, ip: str) -> Dict[str, str]:
         """Get country and organization for an IP address using ip-api.com."""
+        if ip in self.ip_cache:
+            return self.ip_cache[ip]
+
         try:
             import urllib.request
             import json
@@ -440,10 +471,13 @@ class NetworkCollector(BaseCollector):
 
             with urllib.request.urlopen(req, timeout=2) as response:
                 data = json.loads(response.read().decode())
-                return {
+                info = {
                     'country': data.get('country', 'Unknown'),
                     'org': data.get('org', 'Unknown')
                 }
+                self.ip_cache[ip] = info
+                self._save_ip_cache()
+                return info
         except Exception:
             return {'country': 'Unknown', 'org': 'Unknown'}
 
