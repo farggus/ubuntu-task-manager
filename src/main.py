@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 # Ensure src is in python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from const import APP_NAME, APP_VERSION, DEFAULT_CONFIG, LOGGER_PREFIX
+from const import APP_NAME, APP_VERSION, DEFAULT_CONFIG, LOGGER_PREFIX, SLOW_BOTS_FILE
 from dashboard import UTMDashboard
 from utils.logger import setup_exception_logging, setup_logging
 
@@ -81,6 +81,12 @@ def main():
         print(f"Error: {e}")
         logger.critical(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
+    finally:
+        if os.path.exists(SLOW_BOTS_FILE):
+            try:
+                os.remove(SLOW_BOTS_FILE)
+            except Exception as e:
+                logger.error(f"Failed to remove temporary file {SLOW_BOTS_FILE}: {e}")
 
 
 if __name__ == "__main__":

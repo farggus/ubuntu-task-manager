@@ -3,6 +3,11 @@
 import ipaddress
 import shlex
 import subprocess
+import glob
+import gzip
+import statistics
+import os
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import psutil
@@ -13,6 +18,7 @@ from utils.binaries import (
     GREP,
     IP,
     IPTABLES,
+    NFT,
     TAIL,
     UFW,
 )
@@ -79,6 +85,8 @@ class NetworkCollector(BaseCollector):
             'connections': self._get_connections(),
             'open_ports': self._get_open_ports() if self.config.get('network', {}).get('check_open_ports', True) else None,
             'firewall': self._get_firewall_rules() if self.config.get('network', {}).get('check_firewall', True) else None,
+            'iptables': self._get_iptables_detailed(),
+            'nftables': self._get_nftables_rules(),
             'routing': self._get_routing_table(),
             'fail2ban': self._get_fail2ban_status(),
         }
@@ -297,6 +305,97 @@ class NetworkCollector(BaseCollector):
 
         return {}
 
+    def _get_iptables_detailed(self) -> List[Dict[str, Any]]:
+        """Get detailed iptables rules with stats."""
+        try:
+            # sudo iptables -L -n -v --line-numbers
+            result = subprocess.run(
+                [IPTABLES, '-L', '-n', '-v', '--line-numbers'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode != 0:
+                return []
+
+            rules = []
+            current_chain = None
+            current_policy = None
+
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+
+                if line.startswith('Chain'):
+                    # Parse Chain header: Chain INPUT (policy DROP 123 packets, 456 bytes)
+                    parts = line.split()
+                    current_chain = parts[1]
+                    current_policy = 'UNKNOWN'
+                    if '(policy' in line:
+                        try:
+                            pol_idx = parts.index('(policy')
+                            current_policy = parts[pol_idx + 1]
+                        except ValueError:
+                            pass
+                    continue
+
+                if line.startswith('num'):
+                    continue
+
+                # Parse rule line
+                # num pkts bytes target prot opt in out source destination [options]
+                parts = line.split()
+                if len(parts) >= 9 and parts[0].isdigit():
+                    rule = {
+                        'chain': current_chain,
+                        'policy': current_policy,
+                        'num': parts[0],
+                        'pkts': parts[1],
+                        'bytes': parts[2],
+                        'target': parts[3],
+                        'prot': parts[4],
+                        'opt': parts[5],
+                        'in': parts[6],
+                        'out': parts[7],
+                        'source': parts[8],
+                        'destination': parts[9],
+                        'extra': ' '.join(parts[10:]) if len(parts) > 10 else ''
+                    }
+                    rules.append(rule)
+
+            return rules
+        except Exception as e:
+            logger.debug(f"Error getting detailed iptables: {e}")
+            return []
+
+    def _get_nftables_rules(self) -> Dict[str, Any]:
+        """Get nftables ruleset in JSON format."""
+        import json
+        
+        if not NFT:
+            return {'error': 'nft binary not found'}
+
+        try:
+            # sudo nft -j list ruleset
+            result = subprocess.run(
+                [NFT, '-j', 'list', 'ruleset'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode != 0:
+                return {'error': f"Command failed: {result.stderr}"}
+
+            return json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return {'error': 'Failed to parse JSON output'}
+        except Exception as e:
+            logger.debug(f"Error getting nftables rules: {e}")
+            return {'error': str(e)}
+
     def _get_routing_table(self) -> List[Dict[str, str]]:
         """Get routing table."""
         try:
@@ -368,6 +467,11 @@ class NetworkCollector(BaseCollector):
             unbans_jail = self._get_recent_unbans(exclude_ips=active_ips)
             if unbans_jail:
                 result['jails'].append(unbans_jail)
+
+            # Add Slow Brute-Force Analysis
+            slow_bots = self._get_slow_bots_from_cache(exclude_ips=active_ips)
+            if slow_bots:
+                result['jails'].append(slow_bots)
 
         except FileNotFoundError:
             logger.debug("fail2ban-client not found")
@@ -461,6 +565,113 @@ class NetworkCollector(BaseCollector):
         except Exception as e:
             logger.error(f"Failed to get unbans: {e}")
             return None
+
+    def _get_slow_bots_from_cache(self, exclude_ips: set = None) -> Dict[str, Any]:
+        """Load slow bots analysis from JSON cache."""
+        import json
+        from const import SLOW_BOTS_FILE
+        
+        if not os.path.exists(SLOW_BOTS_FILE):
+            return None
+            
+        try:
+            with open(SLOW_BOTS_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            banned_ips = []
+            exclude_ips = exclude_ips or set()
+            
+            for item in data:
+                ip = item.get('ip')
+                if ip in exclude_ips:
+                    continue
+                    
+                # Enrich with Geo info if possible
+                ip_data = self._get_ip_data(ip)
+                
+                # Format interval
+                avg_int = item.get('avg_int', 0)
+                if avg_int < 60:
+                    interval_str = f"{int(avg_int)}s"
+                elif avg_int < 3600:
+                    interval_str = f"{int(avg_int // 60)}m"
+                else:
+                    interval_str = f"{int(avg_int // 3600)}h"
+                
+                banned_ips.append({
+                    'ip': ip,
+                    'country': ip_data.get('country', 'Unknown'),
+                    'org': ip_data.get('org', 'Unknown'),
+                    'jail': item.get('jail', 'unknown'),
+                    'attempts': item.get('count', 0),
+                    'bantime': 0, 
+                    'status': item.get('status', 'Detected'),
+                    'interval': interval_str
+                })
+                
+            if not banned_ips:
+                return None
+                
+            return {
+                'name': 'SLOW BRUTE-FORCE DETECTOR',
+                'currently_banned': 0,
+                'total_banned': len(banned_ips),
+                'banned_ips': banned_ips,
+                'filter_failures': 0
+            }
+        except Exception as e:
+            logger.error(f"Failed to load slow bots: {e}")
+            return None
+
+    def run_f2b_analysis(self) -> str:
+        """Run the analysis script and return its output."""
+        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts/analyze_f2b.py'))
+        try:
+            # Run with sudo
+            result = subprocess.run(
+                ['sudo', 'python3', script_path, '--json'], 
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            return result.stdout
+        except Exception as e:
+            return f"Error running analysis: {e}"
+
+    def ban_ip(self, ip: str, jail: str = 'recidive') -> bool:
+        """Ban an IP manually."""
+        try:
+            subprocess.run(
+                [FAIL2BAN_CLIENT, 'set', jail, 'banip', ip],
+                check=True, timeout=5, capture_output=True
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to ban {ip}: {e}")
+            return False
+
+    def unban_ip(self, ip: str, jail: str = None) -> bool:
+        """Unban an IP manually."""
+        try:
+            if jail:
+                cmd = [FAIL2BAN_CLIENT, 'set', jail, 'unbanip', ip]
+            else:
+                cmd = [FAIL2BAN_CLIENT, 'unban', ip]
+            
+            subprocess.run(cmd, check=True, timeout=5, capture_output=True)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to unban {ip}: {e}")
+            return False
+            
+    def cleanup(self):
+        """Cleanup temporary files."""
+        from const import SLOW_BOTS_FILE
+        if os.path.exists(SLOW_BOTS_FILE):
+            try:
+                os.remove(SLOW_BOTS_FILE)
+            except Exception as e:
+                logger.error(f"Failed to cleanup slow bots file: {e}")
 
     def _get_jail_info(self, jail_name: str) -> Dict[str, Any]:
         """Get detailed information about a specific fail2ban jail."""
@@ -558,13 +769,18 @@ class NetworkCollector(BaseCollector):
         try:
             # Determine log file and pattern based on jail
             if jail_name == 'sshd':
-                log_file = '/var/log/auth.log'
-                result = subprocess.run(
-                    [GREP, '-c', ip, log_file],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.returncode == 0:
-                    return int(result.stdout.strip())
+                # Check auth.log and rotated auth.log.1, etc.
+                count = 0
+                for log_file in glob.glob('/var/log/auth.log*'):
+                    try:
+                        # Use grep for plain text, zgrep for .gz
+                        cmd = ['zgrep' if log_file.endswith('.gz') else 'grep', '-c', ip, log_file]
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+                        if result.returncode == 0:
+                            count += int(result.stdout.strip())
+                    except:
+                        pass
+                return count
             elif jail_name == 'traefik-botsearch':
                 log_file = '/home/app_data/docker/traefik/logs/access.log'
                 result = subprocess.run(
@@ -574,13 +790,17 @@ class NetworkCollector(BaseCollector):
                 if result.returncode == 0:
                     return int(result.stdout.strip())
             elif jail_name == 'recidive':
-                log_file = '/var/log/fail2ban.log'
-                result = subprocess.run(
-                    [GREP, '-c', ip, log_file],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.returncode == 0:
-                    return int(result.stdout.strip())
+                # Check all fail2ban logs
+                count = 0
+                for log_file in glob.glob('/var/log/fail2ban.log*'):
+                    try:
+                        cmd = ['zgrep' if log_file.endswith('.gz') else 'grep', '-c', ip, log_file]
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+                        if result.returncode == 0:
+                            count += int(result.stdout.strip())
+                    except:
+                        pass
+                return count
             elif jail_name == 'openvpn':
                 log_file = '/var/log/syslog'
                 if not os.path.exists(log_file):
@@ -639,17 +859,21 @@ class NetworkCollector(BaseCollector):
                 except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
                     logger.debug(f"Failed to fetch geo data for {ip}: {e}")
 
-            # 2. Count attempts (Update count from log using Python, not grep)
+            # 2. Count attempts (Update count from all rotated logs)
             try:
-                log_file = '/var/log/fail2ban.log'
-                if os.path.exists(log_file):
-                    count = 0
-                    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                        for line in f:
-                            if ip in line:
-                                count += 1
-                    info['attempts'] = count
-            except (OSError, IOError) as e:
+                log_glob = '/var/log/fail2ban.log*'
+                count = 0
+                for log_file in glob.glob(log_glob):
+                    try:
+                        opener = gzip.open if log_file.endswith('.gz') else open
+                        with opener(log_file, 'rt', encoding='utf-8', errors='ignore') as f:
+                            for line in f:
+                                if ip in line:
+                                    count += 1
+                    except Exception as e:
+                        logger.debug(f"Error reading log {log_file}: {e}")
+                info['attempts'] = count
+            except Exception as e:
                 logger.debug(f"Failed to count attempts for {ip}: {e}")
 
             info['last_updated'] = current_time

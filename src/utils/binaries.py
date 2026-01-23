@@ -33,6 +33,7 @@ _DEFAULT_PATHS = {
     'mount': '/usr/bin/mount',
     'which': '/usr/bin/which',
     'cp': '/usr/bin/cp',
+    'nft': '/usr/sbin/nft',
 }
 
 
@@ -100,3 +101,4 @@ MKDIR = get_binary('mkdir')
 MOUNT = get_binary('mount')
 WHICH = get_binary('which')
 CP = get_binary('cp')
+NFT = get_binary('nft')

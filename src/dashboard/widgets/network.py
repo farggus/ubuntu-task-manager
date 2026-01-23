@@ -9,6 +9,7 @@ from textual.containers import Vertical
 from textual.widgets import DataTable, Label, Static
 
 from collectors import NetworkCollector
+from dashboard.widgets.analysis_modal import AnalysisModal
 from utils.logger import get_logger
 from utils.ui_helpers import update_table_preserving_scroll
 
@@ -24,13 +25,20 @@ class NetworkExtendedTab(Vertical):
     VIEW_FIREWALL = 'firewall'
     VIEW_ROUTES = 'routes'
     VIEW_FAIL2BAN = 'fail2ban'
+    VIEW_IPTABLES = 'iptables'
+    VIEW_NFTABLES = 'nftables'
 
     BINDINGS = [
         Binding("p", "show_ports", "Ports"),
         Binding("i", "show_interfaces", "Interfaces"),
-        Binding("f", "show_firewall", "Firewall"),
+        Binding("f", "show_firewall", "Firewall Check"),
         Binding("r", "show_routes", "Routes"),
         Binding("b", "show_fail2ban", "Fail2ban"),
+        Binding("t", "show_iptables", "IPTables"),
+        Binding("n", "show_nftables", "NFTables"),
+        Binding("a", "analyze_logs", "Analyze F2B"),
+        Binding("ctrl+b", "ban_ip", "Ban IP"),
+        Binding("ctrl+u", "unban_ip", "Unban IP"),
     ]
 
     # Virtual interface prefixes (sorted to end)
@@ -82,6 +90,7 @@ class NetworkExtendedTab(Vertical):
         try:
             table = self.query_one("#network_table", DataTable)
             table.clear(columns=True)
+            table.fixed_columns = 0 # Allow all columns to be flexible
 
             if self._current_view == self.VIEW_PORTS:
                 table.add_columns("Port", "Proto", "Address", "Process", "PID", "Conns")
@@ -93,6 +102,17 @@ class NetworkExtendedTab(Vertical):
                 table.add_columns("Destination", "Gateway", "Interface", "Flags")
             elif self._current_view == self.VIEW_FAIL2BAN:
                 table.add_columns("Jail", "Status", "Banned IP", "Country", "Org", "Attempts", "Ban For", "Banned", "Fail")
+            elif self._current_view == self.VIEW_IPTABLES:
+                table.add_columns("Chain", "Num", "Target", "Prot", "Source", "Destination", "Options")
+            elif self._current_view == self.VIEW_NFTABLES:
+                table.add_column("Table")
+                table.add_column("Chain")
+                table.add_column("Type")
+                table.add_column("Hook")
+                table.add_column("Prio")
+                table.add_column("Policy")
+                # Rule Details with extra width for long IPv6 rules (~110 chars)
+                table.add_column("Rule Details", width=115)
         except Exception as e:
             logger.error(f"Failed to setup table columns: {e}")
 
@@ -118,6 +138,81 @@ class NetworkExtendedTab(Vertical):
 
     def action_show_fail2ban(self) -> None:
         self._switch_view(self.VIEW_FAIL2BAN)
+
+    def action_show_iptables(self) -> None:
+        self._switch_view(self.VIEW_IPTABLES)
+
+    def action_show_nftables(self) -> None:
+        self._switch_view(self.VIEW_NFTABLES)
+
+    @work(exclusive=True, thread=True)
+    def action_analyze_logs(self) -> None:
+        """Run fail2ban analysis script."""
+        logger.info("Action Analyze Logs triggered")
+        self.app.call_from_thread(self.notify, "Running analysis... Please wait.")
+        output = self.collector.run_f2b_analysis()
+        self.app.call_from_thread(self.app.push_screen, AnalysisModal(output))
+        # Refresh data to show new pseudo-jail
+        self.app.call_from_thread(self.update_data)
+
+    def _get_selected_ip(self) -> str:
+        """Extract IP from selected row."""
+        try:
+            table = self.query_one("#network_table", DataTable)
+            if not table.cursor_coordinate:
+                return None
+            row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+            row = table.get_row(row_key)
+            
+            if self._current_view == self.VIEW_FAIL2BAN:
+                # Column 2 is "Banned IP" (index 2)
+                # Jail, Status, Banned IP, Country ...
+                # Note: Row content might be Text objects
+                ip_cell = row[2] 
+                return str(ip_cell).strip()
+            
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get IP: {e}")
+            return None
+
+    def action_ban_ip(self) -> None:
+        """Ban selected IP."""
+        ip = self._get_selected_ip()
+        if not ip or ip in ('-', '?', ''):
+            self.notify("No valid IP selected (Select row in Fail2ban view)", severity="warning")
+            return
+            
+        def do_ban():
+            success = self.collector.ban_ip(ip)
+            if success:
+                self.app.call_from_thread(self.notify, f"Banned {ip}")
+                self.app.call_from_thread(self.update_data)
+            else:
+                self.app.call_from_thread(self.notify, f"Failed to ban {ip}", severity="error")
+        
+        self.notify(f"Banning {ip}...")
+        import threading
+        threading.Thread(target=do_ban).start()
+
+    def action_unban_ip(self) -> None:
+        """Unban selected IP."""
+        ip = self._get_selected_ip()
+        if not ip or ip in ('-', '?', ''):
+            self.notify("No valid IP selected", severity="warning")
+            return
+            
+        def do_unban():
+            success = self.collector.unban_ip(ip)
+            if success:
+                self.app.call_from_thread(self.notify, f"Unbanned {ip}")
+                self.app.call_from_thread(self.update_data)
+            else:
+                self.app.call_from_thread(self.notify, f"Failed to unban {ip}", severity="error")
+        
+        self.notify(f"Unbanning {ip}...")
+        import threading
+        threading.Thread(target=do_unban).start()
 
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:
@@ -153,6 +248,10 @@ class NetworkExtendedTab(Vertical):
                 self._populate_routes(table)
             elif self._current_view == self.VIEW_FAIL2BAN:
                 self._populate_fail2ban(table)
+            elif self._current_view == self.VIEW_IPTABLES:
+                self._populate_iptables(table)
+            elif self._current_view == self.VIEW_NFTABLES:
+                self._populate_nftables(table)
         except Exception as e:
             logger.error(f"Failed to update network view: {e}")
 
@@ -167,13 +266,24 @@ class NetworkExtendedTab(Vertical):
 
         # Ports stats
         ports = data.get('open_ports', [])
-        ports_count = len([p for p in ports if 'error' not in p])
+        valid_ports = [p for p in ports if 'error' not in p]
+        ports_count = len(valid_ports)
+        active_conns = sum(p.get('connections', 0) for p in valid_ports)
 
         # Firewall stats
         fw = data.get('firewall', {})
         fw_type = fw.get('type', 'none') if fw else 'none'
         fw_status = fw.get('status', 'unknown') if fw else 'N/A'
-        fw_rules = len(fw.get('rules', [])) if fw else 0
+        
+        # IPtables stats
+        iptables_data = data.get('iptables', [])
+        ipt_count = len(iptables_data) if isinstance(iptables_data, list) else 0
+
+        # NFTables stats
+        nft_data = data.get('nftables', {})
+        nft_count = 0
+        if isinstance(nft_data, dict) and 'nftables' in nft_data:
+            nft_count = sum(1 for item in nft_data['nftables'] if 'rule' in item)
 
         # Firewall status color
         if fw_status in ['active', 'running', 'configured']:
@@ -198,17 +308,20 @@ class NetworkExtendedTab(Vertical):
         view_labels = {
             self.VIEW_PORTS: '► Ports',
             self.VIEW_INTERFACES: '► Interfaces',
-            self.VIEW_FIREWALL: '► Firewall',
+            self.VIEW_FIREWALL: '► FW Check',
             self.VIEW_ROUTES: '► Routes',
             self.VIEW_FAIL2BAN: '► Fail2ban',
+            self.VIEW_IPTABLES: '► IPTables',
+            self.VIEW_NFTABLES: '► NFTables',
         }
-        current = f"[bold cyan]{view_labels[self._current_view]}[/bold cyan]"
+        current = f"[bold cyan]{view_labels.get(self._current_view, 'Unknown')}[/bold cyan]"
 
         return (
             f"{current} │ "
             f"[dim]Ifaces:[/dim] [green]{ifaces_up}[/green]/[white]{ifaces_total}[/white] │ "
-            f"[dim]Ports:[/dim] [white]{ports_count}[/white] │ "
-            f"[dim]FW:[/dim] {fw_status_str} │ "
+            f"[dim]Ports:[/dim] [red]{active_conns}[/red]/[white]{ports_count}[/white] │ "
+            f"[dim]IPT:[/dim] [white]{ipt_count}[/white] │ "
+            f"[dim]NFT:[/dim] [white]{nft_count}[/white] │ "
             f"[dim]F2B:[/dim] [white]{f2b_jails}[/white] jails, [red]{f2b_banned}[/red] banned"
         )
 
@@ -425,17 +538,15 @@ class NetworkExtendedTab(Vertical):
                 t.add_row("No jails configured", "", "", "", "", "", "", "", "")
                 return
 
-            # Sort Jails: OK first, then Active, then recidive, then HISTORY
+            # Sort Jails: OK first, then Active, then recidive, then HISTORY, then SLOW...
             def sort_jails(j):
                 name = j.get('name', '')
                 banned = j.get('currently_banned', 0)
                 
-                if name == 'HISTORY':
-                    return 3
-                if name == 'recidive':
-                    return 2
-                if banned > 0:
-                    return 1
+                if 'SLOW' in name: return 4
+                if name == 'HISTORY': return 3
+                if name == 'recidive': return 2
+                if banned > 0: return 1
                 return 0
 
             jails.sort(key=sort_jails)
@@ -449,24 +560,29 @@ class NetworkExtendedTab(Vertical):
                     banned_ips = jail.get('banned_ips', [])
 
                     # Add separator row between normal jails
-                    if idx > 0 and name != 'HISTORY':
+                    if idx > 0 and name != 'HISTORY' and 'SLOW' not in name:
                         t.add_row("", "", "", "", "", "", "", "", "")
 
-                    # Special handling for HISTORY
-                    if name == 'HISTORY':
+                    # Special handling for HISTORY and SLOW DETECTOR
+                    if name in ('HISTORY', 'SLOW BRUTE-FORCE DETECTOR'):
                         # 1. Separator row
                         t.add_row("", "", "", "", "", "", "", "", "")
                         
-                        # 2. Section Header Row (acting as custom headers for this section)
+                        # 2. Section Header Row
+                        header_style = "bold blue" if name == 'HISTORY' else "bold red"
+                        header_label = "Unbanned:" if name == 'HISTORY' else "Risk Status:"
+                        interval_header = Text("Interval", style="bold") if 'SLOW' in name else ""
+                        
                         t.add_row(
-                            Text("HISTORY", style="bold blue"),
+                            Text(name, style=header_style),
                             Text("Jail", style="bold"),
                             Text("Banned IP", style="bold"),
                             Text("Country", style="bold"),
                             Text("Org", style="bold"),
                             Text("Attempts", style="bold"),
-                            Text("Unbanned:", style="bold"),
-                            "", "" # Banned and Fail columns empty
+                            Text(header_label, style="bold"),
+                            interval_header, 
+                            ""  # Fail col empty
                         )
                         
                         for idx, ip_info in enumerate(banned_ips):
@@ -475,7 +591,10 @@ class NetworkExtendedTab(Vertical):
                             org = ip_info.get('org', '-')
                             if len(org) > 20: org = org[:17] + '...'
                             attempts = ip_info.get('attempts', 0)
-                            unban_time = ip_info.get('unban_time', '')
+                            
+                            # For HISTORY: unban_time. For SLOW: status
+                            extra_info = ip_info.get('unban_time') or ip_info.get('status', '')
+                            
                             jail_origin = ip_info.get('jail', '?')
                             
                             # First column: Total count on first row, then empty
@@ -488,6 +607,17 @@ class NetworkExtendedTab(Vertical):
                             attempts_text = Text(str(attempts))
                             if attempts >= 100: attempts_text.style = "bold red"
                             elif attempts >= 20: attempts_text.style = "yellow"
+                            
+                            # Extra info coloring for SLOW DETECTOR
+                            extra_text = Text(extra_info)
+                            if 'EVASION' in extra_info:
+                                extra_text.style = "bold red"
+                            elif 'CAUGHT' in extra_info:
+                                extra_text.style = "bold yellow"
+
+                            # Interval
+                            interval_val = ip_info.get('interval', '')
+                            interval_text = Text(interval_val, style="bold cyan") if interval_val else ""
 
                             t.add_row(
                                 col1,
@@ -496,8 +626,8 @@ class NetworkExtendedTab(Vertical):
                                 country,
                                 org,
                                 attempts_text,
-                                unban_time, # Displays in "Ban For" column
-                                "", # Banned col empty
+                                extra_text, 
+                                interval_text,
                                 ""  # Fail col empty
                             )
                         continue
@@ -584,5 +714,179 @@ class NetworkExtendedTab(Vertical):
                 except Exception as e:
                     logger.debug(f"Error processing jail: {e}")
                     continue
+
+        update_table_preserving_scroll(table, populate)
+
+    def _populate_iptables(self, table: DataTable) -> None:
+        """Populate table with iptables rules."""
+        def populate(t):
+            rules = self._last_data.get('iptables', [])
+            if not rules:
+                t.add_row("No iptables rules found (or permission denied)", "", "", "", "", "", "")
+                return
+
+            last_chain = None
+            for rule in rules:
+                chain = rule.get('chain', 'UNKNOWN')
+                policy = rule.get('policy', '')
+                
+                # Add separator/header for new chain
+                if chain != last_chain:
+                    if last_chain is not None:
+                         t.add_row("", "", "", "", "", "", "")
+                    
+                    chain_text = Text(chain, style="bold cyan")
+                    if policy:
+                        chain_text.append(f" (policy {policy})", style="dim")
+                    t.add_row(chain_text, "", "", "", "", "", "")
+                    last_chain = chain
+
+                target = rule.get('target', '')
+                if target == 'ACCEPT':
+                    target_text = Text(target, style="green")
+                elif target in ('DROP', 'REJECT'):
+                    target_text = Text(target, style="bold red")
+                else:
+                    target_text = Text(target)
+
+                t.add_row(
+                    "", # Chain column empty for rules
+                    str(rule.get('num', '')),
+                    target_text,
+                    rule.get('prot', ''),
+                    rule.get('source', ''),
+                    rule.get('destination', ''),
+                    rule.get('extra', '')
+                )
+        
+        update_table_preserving_scroll(table, populate)
+
+    def _populate_nftables(self, table: DataTable) -> None:
+        """Populate table with nftables rules."""
+        def populate(t):
+            data = self._last_data.get('nftables', {})
+            if not data or 'error' in data:
+                error = data.get('error', 'No data')
+                t.add_row(f"Error: {error}", "", "", "", "", "", "")
+                return
+            
+            items = data.get('nftables', [])
+            if not items:
+                t.add_row("No nftables rules found", "", "", "", "", "", "")
+                return
+            
+            # Sort items: F2B related first
+            def is_f2b(i):
+                try:
+                    if 'table' in i: return 'f2b' in i['table'].get('name', '')
+                    if 'chain' in i: return 'f2b' in i['chain'].get('name', '') or 'f2b' in i['chain'].get('table', '')
+                    if 'set' in i: return 'f2b' in i['set'].get('name', '') or 'f2b' in i['set'].get('table', '')
+                    if 'rule' in i: return 'f2b' in i['rule'].get('chain', '') or 'f2b' in i['rule'].get('table', '')
+                except:
+                    return False
+                return False
+
+            f2b_items = [i for i in items if is_f2b(i)]
+            other_items = [i for i in items if not is_f2b(i)]
+            sorted_items = f2b_items + other_items
+            
+            current_table = None
+            
+            for item in sorted_items:
+                if 'table' in item:
+                    fam = item['table'].get('family', '')
+                    name = item['table'].get('name', '')
+                    current_table = f"{fam} {name}"
+                    # t.add_row(Text(f"Table: {current_table}", style="bold magenta"), "", "", "", "", "", "")
+                    
+                elif 'chain' in item:
+                    c = item['chain']
+                    name = c.get('name')
+                    type_ = c.get('type', '-')
+                    hook = c.get('hook', '-')
+                    prio = str(c.get('prio', '-'))
+                    policy = c.get('policy', '-')
+                    
+                    policy_style = "green" if policy == 'accept' else "red" if policy == 'drop' else "white"
+                    
+                    t.add_row(
+                        Text(current_table or "?", style="dim"),
+                        Text(name, style="bold cyan"),
+                        type_,
+                        hook,
+                        prio,
+                        Text(policy, style=policy_style),
+                        ""
+                    )
+
+                elif 'set' in item:
+                    s = item['set']
+                    name = s.get('name', 'unknown')
+                    table_name = s.get('table', 'unknown')
+                    family = s.get('family', 'inet')
+                    set_type = s.get('type', '-')
+                    raw_elements = s.get('elem', [])
+                    count = len(raw_elements)
+                    
+                    t.add_row(
+                        Text(f"{family} {table_name}", style="dim"),
+                        Text(f"SET: {name}", style="bold yellow"),
+                        set_type,
+                        "", # Hook
+                        "", # Prio
+                        "", # Policy
+                        f"Elements: {count}"
+                    )
+                    
+                elif 'rule' in item:
+                    r = item['rule']
+                    
+                    # Try to extract verdict and main match info
+                    exprs = r.get('expr', [])
+                    desc_parts = []
+                    
+                    for e in exprs:
+                        key = list(e.keys())[0]
+                        val = e[key]
+                        
+                        if key == 'verdict':
+                            v_key = list(val.keys())[0]
+                            color = "green" if v_key == 'accept' else "bold red" if v_key == 'drop' else "yellow"
+                            desc_parts.append(f"[{color}]{v_key.upper()}[/{color}]")
+                        elif key == 'match':
+                            try:
+                                # Try to interpret basic matches
+                                left = val.get('left', {})
+                                op = val.get('op', '')
+                                right = val.get('right', {})
+                                
+                                field = "?"
+                                if 'payload' in left:
+                                    field = f"{left['payload'].get('protocol', '')}.{left['payload'].get('field', '')}"
+                                elif 'meta' in left:
+                                    field = left['meta'].get('key', '')
+                                
+                                desc_parts.append(f"{field} {op} {right}")
+                            except:
+                                desc_parts.append("match(...)")
+                        elif key == 'counter':
+                             pass # Skip counters
+                        else:
+                             # Convert complex dict to string representation for other keys
+                             desc_parts.append(key)
+
+                    rule_text = ", ".join(desc_parts)
+                    if not rule_text:
+                        rule_text = str(exprs)
+
+                    t.add_row(
+                        "", 
+                        "", 
+                        "", 
+                        "", 
+                        "", 
+                        "", 
+                        rule_text
+                    )
 
         update_table_preserving_scroll(table, populate)
