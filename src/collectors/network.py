@@ -757,67 +757,29 @@ class NetworkCollector(BaseCollector):
         return 0
 
     def _count_ip_attempts(self, ip: str, jail_name: str) -> int:
-        """Count failed attempts for an IP from logs based on jail type."""
-        import os
-        import re
-
-        # Validate IP to prevent injection
-        if not is_valid_ip(ip):
-            logger.warning(f"Invalid IP rejected in _count_ip_attempts: {ip}")
+        """Count failed attempts for an IP from logs (simplified/fast)."""
+        
+        # Only count for specific jails where logs are predictable and fast
+        log_file = None
+        
+        if jail_name == 'sshd':
+            log_file = '/var/log/auth.log'
+        elif 'traefik' in jail_name:
+            log_file = '/home/app_data/docker/traefik/logs/access.log'
+            
+        if not log_file:
             return 0
 
         try:
-            # Determine log file and pattern based on jail
-            if jail_name == 'sshd':
-                # Check auth.log and rotated auth.log.1, etc.
-                count = 0
-                for log_file in glob.glob('/var/log/auth.log*'):
-                    try:
-                        # Use grep for plain text, zgrep for .gz
-                        cmd = ['zgrep' if log_file.endswith('.gz') else 'grep', '-c', ip, log_file]
-                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
-                        if result.returncode == 0:
-                            count += int(result.stdout.strip())
-                    except:
-                        pass
-                return count
-            elif jail_name == 'traefik-botsearch':
-                log_file = '/home/app_data/docker/traefik/logs/access.log'
-                result = subprocess.run(
-                    [GREP, '-c', ip, log_file],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.returncode == 0:
-                    return int(result.stdout.strip())
-            elif jail_name == 'recidive':
-                # Check all fail2ban logs
-                count = 0
-                for log_file in glob.glob('/var/log/fail2ban.log*'):
-                    try:
-                        cmd = ['zgrep' if log_file.endswith('.gz') else 'grep', '-c', ip, log_file]
-                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
-                        if result.returncode == 0:
-                            count += int(result.stdout.strip())
-                    except:
-                        pass
-                return count
-            elif jail_name == 'openvpn':
-                log_file = '/var/log/syslog'
-                if not os.path.exists(log_file):
-                    return 0
-                # Use Python regex instead of shell grep (safe, no injection)
-                pattern = re.compile(rf'ovpn-server.*{re.escape(ip)}')
-                count = 0
-                with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    for line in f:
-                        if pattern.search(line):
-                            count += 1
-                return count
+            # Simple fast grep on current log only
+            cmd = [GREP, '-c', ip, log_file]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+            if result.returncode == 0:
+                return int(result.stdout.strip())
+        except Exception as e:
+            logger.debug(f"Failed to count attempts for {ip} in {log_file}: {e}")
 
-            return 0
-        except (ValueError, OSError, subprocess.TimeoutExpired) as e:
-            logger.debug(f"Error counting IP attempts for {ip}: {e}")
-            return 0
+        return 0
 
     def _get_ip_data(self, ip: str) -> Dict[str, Any]:
         """Get IP data (Geo, attempts) from DB or fetch/calc it."""
