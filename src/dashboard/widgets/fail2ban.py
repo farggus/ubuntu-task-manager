@@ -81,10 +81,11 @@ class Fail2banTab(Vertical):
         yield DataTable(id="f2b_table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        """Setup table and start updates."""
+        """Setup table and load initial data."""
         self._setup_table()
         self.update_data()
-        self.set_interval(60, self.update_data)
+        # No auto-refresh timer - updates are action-driven (ban/unban/analyze)
+        # Use manual Refresh (R) to sync with external changes
 
     def _setup_table(self) -> None:
         """Setup table columns."""
@@ -106,10 +107,24 @@ class Fail2banTab(Vertical):
     def action_analyze_logs(self) -> None:
         """Run fail2ban analysis script."""
         logger.info("Action Analyze Logs triggered")
-        self.app.call_from_thread(self.notify, "Running analysis... Please wait.")
+
+        # Show analyzing state in header
+        def show_analyzing():
+            header = self.query_one("#f2b_header", Label)
+            header.update("[bold yellow]⏳ Analyzing fail2ban logs... Please wait[/bold yellow]")
+
+        self.app.call_from_thread(show_analyzing)
+
+        # Run analysis
         output = self.collector.run_f2b_analysis()
-        self.app.call_from_thread(self.app.push_screen, AnalysisModal(output))
-        self.app.call_from_thread(self.update_data)
+
+        # Show results and refresh data
+        def show_results():
+            self.app.push_screen(AnalysisModal(output))
+            # Refresh to show SLOW section with new data
+            self.update_data()
+
+        self.app.call_from_thread(show_results)
 
     def action_ban_ip(self) -> None:
         """Show confirmation and ban selected IP."""
@@ -139,15 +154,17 @@ class Fail2banTab(Vertical):
 
         if success:
             logger.info(f"Banned {ip} permanently")
-            self.app.call_from_thread(self.notify, f"Banned {ip} permanently")
+            self.app.call_from_thread(
+                self.notify, f"✓ Banned {ip} permanently", severity="information"
+            )
 
             # Remove from original jail if it was a temporary ban
             if jail and jail not in ('recidive', *VIRTUAL_JAILS):
                 self.collector.unban_ip(ip, jail=jail)
                 logger.info(f"Removed {ip} from {jail}")
-                self.app.call_from_thread(self.notify, f"Removed {ip} from {jail}")
 
-            self._schedule_refresh()
+            # Immediate refresh to show updated state
+            self.app.call_from_thread(self.update_data)
         else:
             self._notify_error(f"Failed to ban {ip}")
 
@@ -181,8 +198,11 @@ class Fail2banTab(Vertical):
         success = self.collector.unban_ip(ip, jail=jail)
         if success:
             logger.info(f"Unbanned {ip}")
-            self.app.call_from_thread(self.notify, f"Unbanned {ip}")
-            self._schedule_refresh()
+            self.app.call_from_thread(
+                self.notify, f"✓ Unbanned {ip}", severity="information"
+            )
+            # Immediate refresh to show updated state
+            self.app.call_from_thread(self.update_data)
         else:
             self._notify_error(f"Failed to unban {ip}")
 
@@ -197,10 +217,6 @@ class Fail2banTab(Vertical):
         """Show error notification."""
         logger.error(msg)
         self.app.call_from_thread(self.notify, msg, severity="error")
-
-    def _schedule_refresh(self) -> None:
-        """Schedule data refresh after a short delay."""
-        self.app.call_from_thread(lambda: self.set_timer(0.5, self.update_data))
 
     def _get_selected_ip_info(self) -> Tuple[Optional[str], Optional[str]]:
         """Extract IP and Jail from selected row."""
@@ -466,6 +482,7 @@ class Fail2banTab(Vertical):
     def _render_slow_detector_section(self, t: DataTable, jail: Dict) -> None:
         """Render SLOW BRUTE-FORCE DETECTOR section."""
         total_banned = jail.get('total_banned', 0)
+        excluded_count = jail.get('excluded_count', 0)
         banned_ips = jail.get('banned_ips', [])
 
         # Section separator and header
@@ -484,7 +501,14 @@ class Fail2banTab(Vertical):
 
         # Data rows
         for idx, ip_info in enumerate(banned_ips):
-            col1 = Text(f"Total: {total_banned}", style="red") if idx == 0 else ""
+            # Show total with excluded count on first row
+            if idx == 0:
+                if excluded_count > 0:
+                    col1 = Text(f"Total: {total_banned} ({excluded_count} banned)", style="red")
+                else:
+                    col1 = Text(f"Total: {total_banned}", style="red")
+            else:
+                col1 = ""
             jail_origin = ip_info.get('jail', '?')
             status = ip_info.get('status', '')
             interval = ip_info.get('interval', '')

@@ -117,45 +117,38 @@ def analyze():
 
     candidates.sort(key=lambda x: (x['prio'], x['count']), reverse=True)
 
+    # Save to JSON if requested
     if args.json:
-        # Save to cache/suspicious_ips.json
         cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cache')
         os.makedirs(cache_dir, exist_ok=True)
         json_path = os.path.join(cache_dir, 'suspicious_ips.json')
-        
+
         with open(json_path, 'w') as f:
             json.dump(candidates, f)
-            
-        print(f"\nAnalysis complete. Found {len(candidates)} bots.")
-        print(f"Report saved to: {json_path}")
-        
-        # Recommendations
-        print("\nRECOMMENDATIONS:")
-        print("1. Increase 'findtime' window to 24h (86400s) or more.")
-        print("2. Ban identified subnets (e.g. 93.152.230.0/24).")
-        print("3. Ensure 'recidive' jail is active with long bantime.")
-    else:
-        print(f"\nAnalyzed {len(ip_stats)} unique IPs.")
-        print("\n[FULL SLOW BRUTE-FORCE REPORT]")
-        print("-" * 125)
-        print(f"{ 'IP Address':<18} | {'Jail':<15} | {'Found':<5} | {'Bans':<4} | {'Avg Int':<8} | {'Duration':<8} | {'Status'}")
-        print("-" * 125)
-        
-        for c in candidates:
-            avg_str = format_duration(c['avg_int'])
-            dur_str = format_duration(c['duration'])
-            
-            # Simple colors for CLI output
-            status_display = c['status']
-            if "EVASION" in status_display:
-                status_display = f"\033[91m{status_display}\033[0m"
-            elif "CAUGHT" in status_display:
-                status_display = f"\033[93m{status_display}\033[0m"
 
-            print(f"{c['ip']:<18} | {c['jail']:<15} | {c['count']:<5} | {c['bans']:<4} | {avg_str:<8} | {dur_str:<8} | {status_display}")
+    # Always print the report table
+    print(f"\nAnalyzed {len(ip_stats)} unique IPs.")
+    print("\n[SLOW BRUTE-FORCE REPORT]")
+    print("-" * 110)
+    print(f"{'IP Address':<18} | {'Jail':<15} | {'Found':<5} | {'Bans':<4} | {'Avg Int':<8} | {'Duration':<8} | {'Status'}")
+    print("-" * 110)
 
-        print("-" * 125)
-        print(f"Total Slow Attackers Found: {len(candidates)}")
+    for c in candidates:
+        avg_str = format_duration(c['avg_int'])
+        dur_str = format_duration(c['duration'])
+
+        # Status display (no ANSI colors - will be rendered by RichLog)
+        status_display = c['status']
+
+        print(f"{c['ip']:<18} | {c['jail']:<15} | {c['count']:<5} | {c['bans']:<4} | {avg_str:<8} | {dur_str:<8} | {status_display}")
+
+    print("-" * 110)
+    print(f"Total Slow Attackers Found: {len(candidates)}")
+
+    if candidates:
+        evasion_count = sum(1 for c in candidates if "EVASION" in c['status'])
+        if evasion_count:
+            print(f"\n⚠ {evasion_count} IPs evading detection - consider banning permanently!")
 
 if __name__ == "__main__":
     analyze()

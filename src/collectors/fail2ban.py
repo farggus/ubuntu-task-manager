@@ -317,10 +317,13 @@ class Fail2banCollector(BaseCollector):
 
             exclude_ips = exclude_ips or set()
             banned_ips = []
+            total_from_analysis = len(data)
+            excluded_count = 0
 
             for item in data:
                 ip = item.get('ip')
                 if ip in exclude_ips:
+                    excluded_count += 1
                     continue
 
                 ip_data = self._get_ip_data(ip)
@@ -337,13 +340,15 @@ class Fail2banCollector(BaseCollector):
                     'interval': format_interval(avg_int)
                 })
 
-            if not banned_ips:
+            if not banned_ips and excluded_count == 0:
                 return None
 
             return {
                 'name': 'SLOW BRUTE-FORCE DETECTOR',
                 'currently_banned': 0,
                 'total_banned': len(banned_ips),
+                'total_from_analysis': total_from_analysis,
+                'excluded_count': excluded_count,
                 'banned_ips': banned_ips,
                 'filter_failures': 0
             }
