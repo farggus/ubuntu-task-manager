@@ -4,6 +4,8 @@ import pytest
 from unittest.mock import patch, MagicMock
 import subprocess
 
+from collectors.fail2ban import is_valid_ip
+
 
 class TestNetworkCollector:
     """Tests for NetworkCollector class."""
@@ -18,11 +20,10 @@ class TestNetworkCollector:
         from collectors.network import NetworkCollector
         collector = NetworkCollector()
         assert collector is not None
-        assert hasattr(collector, 'bans_db')
+        assert hasattr(collector, 'fail2ban')
 
     def test_is_valid_ip_valid_ipv4(self):
         """Test IP validation with valid IPv4."""
-        from collectors.network import is_valid_ip
         assert is_valid_ip('192.168.1.1') is True
         assert is_valid_ip('10.0.0.1') is True
         assert is_valid_ip('8.8.8.8') is True
@@ -30,14 +31,12 @@ class TestNetworkCollector:
 
     def test_is_valid_ip_valid_ipv6(self):
         """Test IP validation with valid IPv6."""
-        from collectors.network import is_valid_ip
         assert is_valid_ip('::1') is True
         assert is_valid_ip('2001:db8::1') is True
         assert is_valid_ip('fe80::1') is True
 
     def test_is_valid_ip_invalid(self):
         """Test IP validation with invalid IPs."""
-        from collectors.network import is_valid_ip
         assert is_valid_ip('') is False
         assert is_valid_ip(None) is False
         assert is_valid_ip('not-an-ip') is False
@@ -99,7 +98,6 @@ class TestIPValidation:
 
     def test_ip_validation_edge_cases(self):
         """Test edge cases for IP validation."""
-        from collectors.network import is_valid_ip
         # Whitespace
         assert is_valid_ip('  192.168.1.1  ') is True  # Should strip
         assert is_valid_ip(' ') is False
@@ -110,7 +108,6 @@ class TestIPValidation:
 
     def test_ip_validation_prevents_injection(self):
         """Test that IP validation prevents command injection."""
-        from collectors.network import is_valid_ip
         malicious_inputs = [
             '$(whoami)',
             '`id`',

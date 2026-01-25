@@ -3,7 +3,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from collectors.network import NetworkCollector, is_valid_ip
+from collectors.fail2ban import is_valid_ip
+from collectors.network import NetworkCollector
 
 
 class TestNetworkCollectorExtended(unittest.TestCase):
@@ -231,38 +232,38 @@ class TestFail2ban(unittest.TestCase):
         self.collector = NetworkCollector()
 
     def test_get_fail2ban_status_returns_dict(self):
-        """Test _get_fail2ban_status returns a dictionary."""
-        result = self.collector._get_fail2ban_status()
+        """Test collect returns a dictionary."""
+        result = self.collector.fail2ban.collect()
         self.assertIsInstance(result, dict)
 
     def test_fail2ban_has_installed_key(self):
         """Test fail2ban result has 'installed' key."""
-        result = self.collector._get_fail2ban_status()
+        result = self.collector.fail2ban.collect()
         self.assertIn('installed', result)
 
     def test_fail2ban_has_running_key(self):
         """Test fail2ban result has 'running' key."""
-        result = self.collector._get_fail2ban_status()
+        result = self.collector.fail2ban.collect()
         self.assertIn('running', result)
 
     def test_fail2ban_has_jails_key(self):
         """Test fail2ban result has 'jails' key."""
-        result = self.collector._get_fail2ban_status()
+        result = self.collector.fail2ban.collect()
         self.assertIn('jails', result)
 
-    @patch('subprocess.run')
+    @patch('collectors.fail2ban.subprocess.run')
     def test_fail2ban_handles_timeout(self, mock_run):
         """Test handling of fail2ban-client timeout."""
         import subprocess
         mock_run.side_effect = subprocess.TimeoutExpired('cmd', 10)
-        result = self.collector._get_fail2ban_status()
+        result = self.collector.fail2ban.collect()
         self.assertFalse(result['running'])
 
-    @patch('subprocess.run')
+    @patch('collectors.fail2ban.subprocess.run')
     def test_fail2ban_handles_not_found(self, mock_run):
         """Test handling of fail2ban-client not found."""
         mock_run.side_effect = FileNotFoundError
-        result = self.collector._get_fail2ban_status()
+        result = self.collector.fail2ban.collect()
         self.assertFalse(result['installed'])
 
 
@@ -272,14 +273,14 @@ class TestJailInfo(unittest.TestCase):
     def setUp(self):
         self.collector = NetworkCollector()
 
-    @patch('subprocess.run')
+    @patch('collectors.fail2ban.subprocess.run')
     def test_get_jail_info_handles_failure(self, mock_run):
         """Test handling of jail info failure."""
         mock_run.return_value = MagicMock(returncode=1)
-        result = self.collector._get_jail_info('sshd')
+        result = self.collector.fail2ban._get_jail_info('sshd')
         self.assertIsNone(result)
 
-    @patch('subprocess.run')
+    @patch('collectors.fail2ban.subprocess.run')
     def test_get_jail_info_parses_output(self, mock_run):
         """Test parsing of jail info."""
         mock_run.return_value = MagicMock(
@@ -290,10 +291,10 @@ class TestJailInfo(unittest.TestCase):
                    'Banned IP list: 1.2.3.4 5.6.7.8\n'
         )
         # Mock the bantime call too
-        with patch.object(self.collector, '_get_jail_bantime', return_value=600):
-            with patch.object(self.collector, '_get_ip_data', return_value={'country': 'US', 'org': 'Test'}):
-                with patch.object(self.collector, '_count_ip_attempts', return_value=10):
-                    result = self.collector._get_jail_info('sshd')
+        with patch.object(self.collector.fail2ban, '_get_jail_bantime', return_value=600):
+            with patch.object(self.collector.fail2ban, '_get_ip_data', return_value={'country': 'US', 'org': 'Test'}):
+                with patch.object(self.collector.fail2ban, '_count_ip_attempts', return_value=10):
+                    result = self.collector.fail2ban._get_jail_info('sshd')
                     self.assertIsNotNone(result)
                     self.assertEqual(result['name'], 'sshd')
 
@@ -304,21 +305,21 @@ class TestJailBantime(unittest.TestCase):
     def setUp(self):
         self.collector = NetworkCollector()
 
-    @patch('subprocess.run')
+    @patch('collectors.fail2ban.subprocess.run')
     def test_get_jail_bantime_parses_output(self, mock_run):
         """Test parsing of bantime."""
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout='600\n'
         )
-        result = self.collector._get_jail_bantime('sshd')
+        result = self.collector.fail2ban._get_jail_bantime('sshd')
         self.assertEqual(result, 600)
 
-    @patch('subprocess.run')
+    @patch('collectors.fail2ban.subprocess.run')
     def test_get_jail_bantime_handles_failure(self, mock_run):
         """Test handling of bantime failure."""
         mock_run.return_value = MagicMock(returncode=1)
-        result = self.collector._get_jail_bantime('sshd')
+        result = self.collector.fail2ban._get_jail_bantime('sshd')
         self.assertEqual(result, 0)
 
 
@@ -377,8 +378,8 @@ class TestBansDB(unittest.TestCase):
         self.collector = NetworkCollector()
 
     def test_bans_db_initialized(self):
-        """Test that bans_db is initialized."""
-        self.assertIsInstance(self.collector.bans_db, dict)
+        """Test that IP cache is initialized."""
+        self.assertIsInstance(self.collector.fail2ban._ip_cache, dict)
 
 
 if __name__ == '__main__':

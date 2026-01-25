@@ -1,6 +1,7 @@
 """Collectors package for gathering system information."""
 
 from .base import BaseCollector
+from .fail2ban import Fail2banCollector
 from .network import NetworkCollector
 from .processes import ProcessesCollector
 from .services import ServicesCollector
@@ -10,10 +11,11 @@ from .users import UsersCollector
 
 __all__ = [
     'BaseCollector',
-    'SystemCollector',
-    'ServicesCollector',
+    'Fail2banCollector',
     'NetworkCollector',
+    'ProcessesCollector',
+    'ServicesCollector',
+    'SystemCollector',
     'TasksCollector',
     'UsersCollector',
-    'ProcessesCollector',
 ]

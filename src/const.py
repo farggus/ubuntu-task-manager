@@ -19,6 +19,18 @@ CACHE_DIR = BASE_DIR / "cache"
 BANS_DB_FILE = os.path.join(CACHE_DIR, 'bans_db.json')
 SLOW_BOTS_FILE = os.path.join(CACHE_DIR, 'suspicious_ips.json')
 
+# Time constants (seconds)
+SECONDS_IN_MINUTE = 60
+SECONDS_IN_HOUR = 3600
+SECONDS_IN_DAY = 86400
+SECONDS_IN_MONTH = 2592000  # 30 days
+
+# Fail2ban constants
+IP_CACHE_TTL = 300  # 5 minutes - TTL for geo-data cache
+UNBAN_HISTORY_LIMIT = 500  # Max entries in unban history
+SLOW_BOT_MIN_INTERVAL = 600  # Minimum interval for slow bot detection (10 min)
+ORG_DISPLAY_MAX_LEN = 20  # Max length for org name display
+
 # Ensure directories exist
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(CACHE_DIR, exist_ok=True)

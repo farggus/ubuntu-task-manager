@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from rich.text import Text
 from textual import work
+from textual._context import NoActiveAppError
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Label, Static
@@ -154,8 +155,11 @@ class UsersTab(Vertical):
             data = self.collector.update()
             self._last_data = data
             self.app.call_from_thread(self._update_view)
+        except NoActiveAppError:
+            # App not ready or shutting down - ignore silently
+            pass
         except Exception as e:
-            logger.error(f"Failed to update users data: {e}")
+            logger.error(f"Failed to update users data: {type(e).__name__}: {e}")
 
     def _update_view(self) -> None:
         """Update table with current view mode."""
