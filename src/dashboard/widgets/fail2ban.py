@@ -49,8 +49,8 @@ class Fail2banTab(Vertical):
     """Tab displaying Fail2ban information and controls."""
 
     BINDINGS = [
-        Binding("comma", "prev_tab", ", Prev Tab", show=False),
-        Binding("full_stop", "next_tab", ". Next Tab", show=False),
+        Binding("less", "prev_tab", "< Prev Tab", show=False),
+        Binding("greater", "next_tab", "> Next Tab", show=False),
         Binding("a", "analyze_logs", "Analyze F2B"),
         Binding("ctrl+b", "ban_ip", "Ban IP"),
         Binding("ctrl+u", "unban_ip", "Unban IP"),
@@ -140,6 +140,15 @@ class Fail2banTab(Vertical):
             elif widget.id == "tab_slow":
                 self._switch_to_tab(SubTab.SLOW)
 
+    def on_key(self, event) -> None:
+        """Handle key events for sub-tab switching."""
+        if event.key == "less":
+            self.action_prev_tab()
+            event.stop()
+        elif event.key == "greater":
+            self.action_next_tab()
+            event.stop()
+
     def action_prev_tab(self) -> None:
         """Switch to previous sub-tab."""
         tabs = [SubTab.ACTIVE, SubTab.HISTORY, SubTab.SLOW]
@@ -167,9 +176,9 @@ class Fail2banTab(Vertical):
     def _update_tab_bar(self) -> None:
         """Update the tab bar display."""
         tabs_config = [
-            ("tab_active", SubTab.ACTIVE, ", Active"),
+            ("tab_active", SubTab.ACTIVE, "< Active"),
             ("tab_history", SubTab.HISTORY, "History"),
-            ("tab_slow", SubTab.SLOW, "Slow ."),
+            ("tab_slow", SubTab.SLOW, "Slow >"),
         ]
 
         for tab_id, tab_type, label in tabs_config:
