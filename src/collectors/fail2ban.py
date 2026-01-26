@@ -7,13 +7,15 @@ import os
 import subprocess
 import time
 import urllib.request
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from const import (
     BANS_DB_FILE,
     IP_CACHE_TTL,
+    RECIDIVE_BANTIME,
     SLOW_BOTS_FILE,
     UNBAN_HISTORY_LIMIT,
+    WHITELIST_FILE,
 )
 from utils.binaries import FAIL2BAN_CLIENT, GREP, TAIL
 from utils.formatters import format_interval
@@ -43,7 +45,9 @@ class Fail2banCollector(BaseCollector):
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
         self._ip_cache: Dict[str, Dict[str, Any]] = {}
+        self._whitelist: List[str] = []
         self._load_ip_cache()
+        self._load_whitelist()
 
     def _load_ip_cache(self) -> None:
         """Load IP cache from disk."""
@@ -62,6 +66,53 @@ class Fail2banCollector(BaseCollector):
                 json.dump(self._ip_cache, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save IP cache: {e}")
+
+    def _load_whitelist(self) -> None:
+        """Load whitelist from disk."""
+        if os.path.exists(WHITELIST_FILE):
+            try:
+                with open(WHITELIST_FILE, 'r', encoding='utf-8') as f:
+                    self._whitelist = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load whitelist: {e}")
+                self._whitelist = []
+
+    def _save_whitelist(self) -> None:
+        """Save whitelist to disk."""
+        try:
+            with open(WHITELIST_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self._whitelist, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save whitelist: {e}")
+
+    def get_whitelist(self) -> List[str]:
+        """Get current whitelist."""
+        return self._whitelist.copy()
+
+    def add_to_whitelist(self, ip: str) -> bool:
+        """Add IP to whitelist."""
+        if not is_valid_ip(ip):
+            logger.error(f"Invalid IP for whitelist: {ip}")
+            return False
+        if ip not in self._whitelist:
+            self._whitelist.append(ip)
+            self._save_whitelist()
+            logger.info(f"Added {ip} to whitelist")
+            return True
+        return False
+
+    def remove_from_whitelist(self, ip: str) -> bool:
+        """Remove IP from whitelist."""
+        if ip in self._whitelist:
+            self._whitelist.remove(ip)
+            self._save_whitelist()
+            logger.info(f"Removed {ip} from whitelist")
+            return True
+        return False
+
+    def is_whitelisted(self, ip: str) -> bool:
+        """Check if IP is in whitelist."""
+        return ip in self._whitelist
 
     def collect(self) -> Dict[str, Any]:
         """Collect Fail2ban status and jail information.
@@ -224,19 +275,25 @@ class Fail2banCollector(BaseCollector):
         limit: int = UNBAN_HISTORY_LIMIT,
         exclude_ips: Optional[Set[str]] = None
     ) -> Optional[Dict[str, Any]]:
-        """Get recently unbanned IPs from fail2ban log."""
-        log_file = '/var/log/fail2ban.log'
+        """Get recently unbanned IPs from fail2ban logs (including rotated)."""
         exclude_ips = exclude_ips or set()
 
-        if not os.path.exists(log_file):
+        # Get all fail2ban log files, sorted newest first
+        log_files = sorted(glob.glob('/var/log/fail2ban.log*'), reverse=True)
+        if not log_files:
             return None
 
         try:
             unban_lines = []
-            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                for line in f:
-                    if 'Unban' in line:
-                        unban_lines.append(line.strip())
+            for log_file in log_files:
+                try:
+                    opener = gzip.open if log_file.endswith('.gz') else open
+                    with opener(log_file, 'rt', encoding='utf-8', errors='ignore') as f:
+                        for line in f:
+                            if 'Unban' in line:
+                                unban_lines.append(line.strip())
+                except Exception as e:
+                    logger.debug(f"Error reading log {log_file}: {e}")
 
             # Take last limit*3 lines (equivalent to tail)
             unban_lines = unban_lines[-(limit * 3):]
@@ -426,26 +483,32 @@ class Fail2banCollector(BaseCollector):
             return 0
 
     def _count_ip_attempts(self, ip: str, jail_name: str) -> int:
-        """Count failed attempts for an IP from service logs."""
-        log_file = None
+        """Count failed attempts for an IP from service logs (including rotated)."""
+        log_pattern = None
 
         if jail_name == 'sshd':
-            log_file = '/var/log/auth.log'
+            log_pattern = '/var/log/auth.log*'
         elif 'traefik' in jail_name:
-            log_file = '/home/app_data/docker/traefik/logs/access.log'
+            log_pattern = '/home/app_data/docker/traefik/logs/access.log*'
 
-        if not log_file:
+        if not log_pattern:
             return 0
 
+        count = 0
         try:
-            cmd = [GREP, '-c', ip, log_file]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
-            if result.returncode == 0:
-                return int(result.stdout.strip())
+            for log_file in glob.glob(log_pattern):
+                try:
+                    opener = gzip.open if log_file.endswith('.gz') else open
+                    with opener(log_file, 'rt', encoding='utf-8', errors='ignore') as f:
+                        for line in f:
+                            if ip in line:
+                                count += 1
+                except Exception as e:
+                    logger.debug(f"Error reading log {log_file}: {e}")
         except Exception as e:
-            logger.debug(f"Failed to count attempts for {ip} in {log_file}: {e}")
+            logger.debug(f"Failed to count attempts for {ip}: {e}")
 
-        return 0
+        return count
 
     def _get_traefik_target_for_ip(
         self,
@@ -502,12 +565,20 @@ class Fail2banCollector(BaseCollector):
     # Public API methods
 
     def ban_ip(self, ip: str, jail: str = 'recidive') -> bool:
-        """Ban an IP manually."""
+        """Ban an IP manually with 3-year bantime for recidive."""
         if not is_valid_ip(ip):
             logger.error(f"Invalid IP for ban: {ip}")
             return False
 
         try:
+            # Set 3-year bantime for recidive jail
+            if jail == 'recidive':
+                subprocess.run(
+                    [FAIL2BAN_CLIENT, 'set', jail, 'bantime', str(RECIDIVE_BANTIME)],
+                    timeout=5,
+                    capture_output=True
+                )
+
             subprocess.run(
                 [FAIL2BAN_CLIENT, 'set', jail, 'banip', ip],
                 check=True,
@@ -520,8 +591,81 @@ class Fail2banCollector(BaseCollector):
             logger.error(f"Failed to ban {ip}: {e}")
             return False
 
+    def migrate_recidive_bans(self) -> Tuple[int, int]:
+        """Migrate all recidive bans to 3-year bantime.
+
+        Returns:
+            Tuple of (success_count, total_count)
+        """
+        # First set the bantime to 3 years
+        try:
+            subprocess.run(
+                [FAIL2BAN_CLIENT, 'set', 'recidive', 'bantime', str(RECIDIVE_BANTIME)],
+                timeout=5,
+                capture_output=True
+            )
+        except Exception as e:
+            logger.error(f"Failed to set recidive bantime: {e}")
+            return (0, 0)
+
+        # Get currently banned IPs in recidive
+        try:
+            result = subprocess.run(
+                [FAIL2BAN_CLIENT, 'status', 'recidive'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode != 0:
+                return (0, 0)
+
+            # Parse banned IPs
+            banned_ips = []
+            for line in result.stdout.splitlines():
+                if 'Banned IP list:' in line:
+                    ip_part = line.split(':', 1)[1].strip()
+                    if ip_part:
+                        banned_ips = ip_part.split()
+                    break
+
+            if not banned_ips:
+                logger.info("No IPs to migrate in recidive")
+                return (0, 0)
+
+            # Re-ban each IP (unban + ban with new bantime)
+            success = 0
+            for ip in banned_ips:
+                try:
+                    # Unban
+                    subprocess.run(
+                        [FAIL2BAN_CLIENT, 'set', 'recidive', 'unbanip', ip],
+                        timeout=5,
+                        capture_output=True
+                    )
+                    # Re-ban with new bantime
+                    subprocess.run(
+                        [FAIL2BAN_CLIENT, 'set', 'recidive', 'banip', ip],
+                        timeout=5,
+                        capture_output=True
+                    )
+                    success += 1
+                    logger.debug(f"Migrated {ip} to 3-year ban")
+                except Exception as e:
+                    logger.error(f"Failed to migrate {ip}: {e}")
+
+            logger.info(f"Migrated {success}/{len(banned_ips)} recidive bans to 3 years")
+            return (success, len(banned_ips))
+
+        except Exception as e:
+            logger.error(f"Failed to migrate recidive bans: {e}")
+            return (0, 0)
+
     def unban_ip(self, ip: str, jail: Optional[str] = None) -> bool:
-        """Unban an IP manually."""
+        """Unban an IP manually.
+
+        Returns True if IP was successfully unbanned or was not banned.
+        Returns False only on actual errors (timeout, permission denied, etc).
+        """
         if not is_valid_ip(ip):
             logger.error(f"Invalid IP for unban: {ip}")
             return False
@@ -532,9 +676,29 @@ class Fail2banCollector(BaseCollector):
             else:
                 cmd = [FAIL2BAN_CLIENT, 'unban', ip]
 
-            subprocess.run(cmd, check=True, timeout=5, capture_output=True)
-            logger.info(f"Unbanned {ip}" + (f" from {jail}" if jail else ""))
-            return True
+            result = subprocess.run(cmd, timeout=5, capture_output=True, text=True)
+
+            # Check both stdout and stderr for messages
+            output_lower = (result.stdout + result.stderr).lower()
+
+            if result.returncode == 0:
+                logger.info(f"Unbanned {ip}" + (f" from {jail}" if jail else ""))
+                return True
+
+            # Check if IP was simply not banned (not an error)
+            # fail2ban outputs various messages: "not banned", "is not banned", "not in jail"
+            not_banned_patterns = ['not banned', 'is not banned', 'not in jail', 'not in the']
+            if any(pattern in output_lower for pattern in not_banned_patterns):
+                logger.debug(f"IP {ip} was not banned" + (f" in {jail}" if jail else ""))
+                return True  # Not an error - goal achieved
+
+            error_msg = result.stderr.strip() or result.stdout.strip()
+            logger.warning(f"Unban command failed for {ip}: {error_msg}")
+            return False
+
+        except subprocess.TimeoutExpired:
+            logger.error(f"Unban timed out for {ip}")
+            return False
         except Exception as e:
             logger.error(f"Failed to unban {ip}: {e}")
             return False

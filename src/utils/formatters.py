@@ -9,6 +9,7 @@ from const import (
     SECONDS_IN_DAY,
     SECONDS_IN_HOUR,
     SECONDS_IN_MINUTE,
+    SECONDS_IN_YEAR,
 )
 
 
@@ -36,7 +37,7 @@ def format_bantime(seconds: int) -> str:
         seconds: Ban duration in seconds
 
     Returns:
-        Formatted string like "7d (til 25.01.26)" or "-" if no ban
+        Formatted string like "7d (til 25.01.26)", "3Y (til 26.01.29)" or "-" if no ban
     """
     if seconds <= 0:
         return "-"
@@ -44,7 +45,10 @@ def format_bantime(seconds: int) -> str:
     expiry = datetime.now() + timedelta(seconds=seconds)
     expiry_str = expiry.strftime("%d.%m.%y")
 
-    if seconds >= SECONDS_IN_DAY:
+    if seconds >= SECONDS_IN_YEAR:
+        years = seconds // SECONDS_IN_YEAR
+        return f"{years}Y (til {expiry_str})"
+    elif seconds >= SECONDS_IN_DAY:
         days = seconds // SECONDS_IN_DAY
         return f"{days}d (til {expiry_str})"
     elif seconds >= SECONDS_IN_HOUR:

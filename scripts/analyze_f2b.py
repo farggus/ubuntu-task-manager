@@ -150,5 +150,67 @@ def analyze():
         if evasion_count:
             print(f"\n⚠ {evasion_count} IPs evading detection - consider banning permanently!")
 
+    # Print recommendations
+    print_recommendations(candidates, ip_stats)
+
+
+def print_recommendations(candidates, ip_stats):
+    """Print fail2ban configuration recommendations based on analysis."""
+    print("\n" + "=" * 110)
+    print("[RECOMMENDATIONS]")
+    print("=" * 110)
+
+    evasion_count = sum(1 for c in candidates if "EVASION" in c['status'])
+    slow_count = len(candidates)
+
+    if evasion_count == 0 and slow_count == 0:
+        print("✓ No slow brute-force attacks detected. Current configuration is effective.")
+        return
+
+    recommendations = []
+
+    if evasion_count > 0:
+        recommendations.append(
+            f"• {evasion_count} IPs are evading detection. Consider:\n"
+            "  - Increase findtime (e.g., 1h → 24h) to catch slow attackers\n"
+            "  - Decrease maxretry (e.g., 5 → 3) for stricter detection\n"
+            "  - Ban detected IPs manually via Ctrl+B in the Slow tab"
+        )
+
+    # Check for multi-jail attackers
+    multi_jail = [c for c in candidates if ',' in c.get('jail', '')]
+    if multi_jail:
+        recommendations.append(
+            f"• {len(multi_jail)} IPs attack multiple services. Consider:\n"
+            "  - Enable recidive jail for repeat offenders\n"
+            "  - Set longer bantime in recidive (e.g., 1 year+)"
+        )
+
+    # Check for long-duration attacks
+    long_attacks = [c for c in candidates if c.get('duration', 0) > 86400 * 7]
+    if long_attacks:
+        recommendations.append(
+            f"• {len(long_attacks)} IPs persist for 7+ days. Consider:\n"
+            "  - Add persistent attackers to permanent blocklist\n"
+            "  - Configure firewall-level blocking for repeat offenders"
+        )
+
+    # General recommendations
+    if slow_count >= 5:
+        recommendations.append(
+            "• High volume of slow attackers detected. Consider:\n"
+            "  - Implement rate limiting at reverse proxy level\n"
+            "  - Enable geo-blocking for unused regions\n"
+            "  - Use fail2ban aggressive mode for critical services"
+        )
+
+    for rec in recommendations:
+        print(rec)
+        print()
+
+    print("-" * 110)
+    print("Tip: Use Ctrl+B in Slow tab to permanently ban detected IPs in recidive jail")
+
+
 if __name__ == "__main__":
     analyze()

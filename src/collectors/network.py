@@ -382,6 +382,26 @@ class NetworkCollector(BaseCollector):
         """Run fail2ban analysis. Delegates to Fail2banCollector."""
         return self.fail2ban.run_analysis()
 
+    def get_whitelist(self) -> list:
+        """Get whitelist. Delegates to Fail2banCollector."""
+        return self.fail2ban.get_whitelist()
+
+    def add_to_whitelist(self, ip: str) -> bool:
+        """Add IP to whitelist. Delegates to Fail2banCollector."""
+        return self.fail2ban.add_to_whitelist(ip)
+
+    def remove_from_whitelist(self, ip: str) -> bool:
+        """Remove IP from whitelist. Delegates to Fail2banCollector."""
+        return self.fail2ban.remove_from_whitelist(ip)
+
+    def is_whitelisted(self, ip: str) -> bool:
+        """Check if IP is whitelisted. Delegates to Fail2banCollector."""
+        return self.fail2ban.is_whitelisted(ip)
+
+    def migrate_recidive_bans(self) -> tuple:
+        """Migrate recidive bans to 3-year bantime. Delegates to Fail2banCollector."""
+        return self.fail2ban.migrate_recidive_bans()
+
     def cleanup(self) -> None:
         """Cleanup temporary files. Delegates to Fail2banCollector."""
         self.fail2ban.cleanup()
