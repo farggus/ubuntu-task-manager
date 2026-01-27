@@ -7,14 +7,14 @@ from datetime import datetime
 from typing import Optional, Set, Tuple
 
 from rich.markup import escape
-from textual import work, on
+from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.timer import Timer
 from textual.widgets import Input, Label, RichLog, Select, Static
 
-from const import LOG_FILE, LOG_DIR
+from const import LOG_DIR, LOG_FILE
 
 
 class LoggingTab(Vertical):

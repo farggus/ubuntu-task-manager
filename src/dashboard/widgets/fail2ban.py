@@ -20,8 +20,8 @@ from dashboard.widgets.whitelist_modal import WhitelistModal
 from models.fail2ban import JailType
 from utils.formatters import (
     format_attempts,
-    format_bantime,
     format_banned_count,
+    format_bantime,
     format_jail_status,
     format_org,
     format_status,

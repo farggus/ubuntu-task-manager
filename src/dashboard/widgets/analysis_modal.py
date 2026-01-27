@@ -2,6 +2,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, RichLog
 
+
 class AnalysisModal(ModalScreen):
     DEFAULT_CSS = """
     AnalysisModal {
