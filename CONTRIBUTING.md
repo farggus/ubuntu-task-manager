@@ -58,6 +58,55 @@ We use the following tools to maintain code quality:
 - **Type hints**: Required for public methods
 - **Docstrings**: Required for classes and public methods
 
+### Language Requirements
+
+> **IMPORTANT**: All code, comments, documentation, commit messages, and PR descriptions **MUST** be written in **English**.
+
+This is an international open-source project. Using English ensures:
+- ✅ All contributors can understand and review code
+- ✅ Documentation is accessible worldwide
+- ✅ Issue discussions are inclusive
+- ✅ The project maintains professional standards
+
+**What must be in English:**
+- ✅ Code comments (`# This is correct`)
+- ✅ Docstrings (function/class documentation)
+- ✅ Variable and function names (`get_user_data` not `получить_данные_пользователя`)
+- ✅ Log messages (`logger.info("User logged in")`)
+- ✅ Documentation files (README, CONTRIBUTING, etc.)
+- ✅ Commit messages (`feat: add user authentication`)
+- ✅ Issues and Pull Request titles/descriptions
+- ✅ Code reviews and comments
+
+**Example - Correct:**
+```python
+def get_jail_info(jail_name: str) -> Optional[Dict[str, Any]]:
+    """Get detailed information about a specific jail.
+    
+    Args:
+        jail_name: Name of the fail2ban jail
+        
+    Returns:
+        Dictionary with jail information or None if not found
+    """
+    logger.debug(f"Processing jail '{jail_name}'")
+    # Check if jail exists
+    if not jail_name:
+        return None
+    return jail_data
+```
+
+**Example - Incorrect:**
+```python
+def get_jail_info(jail_name: str) -> Optional[Dict[str, Any]]:
+    """Получить детальную информацию о jail."""  # ❌ Russian
+    logger.debug(f"Обработка jail '{jail_name}'")  # ❌ Russian
+    # Проверка существования jail  # ❌ Russian
+    if not jail_name:
+        return None
+    return jail_data
+```
+
 ### Running Linters
 
 ```bash

@@ -1,41 +1,41 @@
 # Fail2Ban Logging Refactoring
 
-## Внесенные изменения
+## Changes Made
 
-### Цель
-Перевод отладочных логов Fail2Ban на правильные уровни логирования (DEBUG/INFO/WARNING) вместо использования INFO с префиксом `[BAN DEBUG]`.
+### Goal
+Migrate Fail2Ban debug logs to proper logging levels (DEBUG/INFO/WARNING) instead of using INFO with `[BAN DEBUG]` prefix.
 
-### Файлы изменены
-1. `src/collectors/fail2ban.py` - коллектор Fail2Ban данных
-2. `src/dashboard/widgets/fail2ban.py` - виджет интерфейса Fail2Ban
+### Modified Files
+1. `src/collectors/fail2ban.py` - Fail2Ban data collector
+2. `src/dashboard/widgets/fail2ban.py` - Fail2Ban UI widget
 
-## Новая структура логирования
+## New Logging Structure
 
-### DEBUG (детальные шаги)
+### DEBUG (detailed steps)
 ```python
 logger.debug("Starting Fail2Ban data collection")
 logger.debug(f"Processed jail '{jail_name}' in {duration:.3f}s")
 logger.debug("IP validation passed for {ip}")
 ```
 
-**Когда используется:**
-- Начало операций (без времени)
-- Обработка отдельных элементов (jail, IP)
-- Промежуточные шаги
+**When to use:**
+- Operation start (without timing)
+- Processing individual items (jails, IPs)
+- Intermediate steps
 
-### INFO (важные события)
+### INFO (important events)
 ```python
 logger.info(f"Banning IP {ip} in jail '{jail}'")
 logger.info(f"Fail2Ban collection completed: {total_banned} banned IPs, ...")
 logger.info(f"Successfully banned IP {ip} in {time:.2f}s")
 ```
 
-**Когда используется:**
-- Действия пользователя (ban/unban)
-- Итоги операций с метриками
-- Успешное завершение важных операций
+**When to use:**
+- User actions (ban/unban)
+- Operation summaries with metrics
+- Successful completion of important operations
 
-### WARNING (медленные операции)
+### WARNING (slow operations)
 ```python
 if duration > 5.0:
     logger.warning(f"Slow jail processing: '{jail_name}' took {duration:.2f}s")
@@ -43,45 +43,45 @@ if duration > 10.0:
     logger.warning(f"Slow collector update took {duration:.2f}s")
 ```
 
-**Когда используется:**
-- Операции > 5 секунд (jail processing)
-- Операции > 10 секунд (collector update)
-- Неожиданные ситуации
+**When to use:**
+- Operations > 5 seconds (jail processing)
+- Operations > 10 seconds (collector update)
+- Unexpected situations
 
-### ERROR (ошибки)
+### ERROR (errors)
 ```python
 logger.error(f"Invalid IP address for ban: {ip}")
 logger.error(f"Failed to ban IP {ip}: {e}")
 ```
 
-**Когда используется:**
-- Невалидные входные данные
-- Исключения и ошибки выполнения
+**When to use:**
+- Invalid input data
+- Exceptions and execution errors
 
-## Использование
+## Usage
 
-### По умолчанию (production)
+### Default (production)
 ```bash
 python src/main.py
 ```
-**Результат:** Только INFO, WARNING, ERROR логи (без DEBUG)
+**Result:** Only INFO, WARNING, ERROR logs (no DEBUG)
 
-### С отладкой (development)
+### With debugging (development)
 ```bash
 python src/main.py --debug
 ```
-**Результат:** Все уровни логов (DEBUG, INFO, WARNING, ERROR)
+**Result:** All log levels (DEBUG, INFO, WARNING, ERROR)
 
-### Примеры вывода
+### Output Examples
 
-**Без `--debug`:**
+**Without `--debug`:**
 ```
 2026-01-27 20:35:05 - INFO - [utm.fail2ban_collector] - Fail2Ban collection completed: 185 banned IPs, 7 jails, duration=42.89s
 2026-01-27 20:35:10 - INFO - [utm.fail2ban_tab] - Banning IP 192.168.1.100 in jail 'recidive'
 2026-01-27 20:35:11 - INFO - [utm.fail2ban_collector] - Successfully banned IP 192.168.1.100 in 0.85s
 ```
 
-**С `--debug`:**
+**With `--debug`:**
 ```
 2026-01-27 20:35:05 - DEBUG - [utm.fail2ban_collector] - Starting Fail2Ban data collection
 2026-01-27 20:35:05 - DEBUG - [utm.fail2ban_collector] - fail2ban-client status executed in 0.123s
@@ -92,17 +92,17 @@ python src/main.py --debug
 2026-01-27 20:35:47 - INFO - [utm.fail2ban_collector] - Fail2Ban collection completed: 185 banned IPs, 7 jails, duration=42.89s
 ```
 
-## Преимущества
+## Benefits
 
-✅ **Стандартная практика Python** - использование встроенных уровней логирования
-✅ **Легкое управление** - включение/выключение через флаг `--debug`
-✅ **Чистые логи** - убран redundant префикс `[BAN DEBUG]`
-✅ **Автоматические предупреждения** - медленные операции выделяются WARNING
-✅ **Совместимость** - работает со всеми стандартными инструментами логирования
+✅ **Standard Python practice** - using built-in logging levels
+✅ **Easy control** - enable/disable via `--debug` flag
+✅ **Clean logs** - removed redundant `[BAN DEBUG]` prefix
+✅ **Automatic warnings** - slow operations highlighted with WARNING
+✅ **Compatibility** - works with all standard logging tools
 
-## Обратная совместимость
+## Backward Compatibility
 
-Все изменения полностью обратно совместимы:
-- Существующие конфиги работают без изменений
-- Не требуется изменение скриптов запуска
-- Поведение по умолчанию не изменилось
+All changes are fully backward compatible:
+- Existing configs work without modifications
+- No changes required to startup scripts
+- Default behavior unchanged
