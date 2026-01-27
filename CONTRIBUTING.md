@@ -96,17 +96,6 @@ def get_jail_info(jail_name: str) -> Optional[Dict[str, Any]]:
     return jail_data
 ```
 
-**Example - Incorrect:**
-```python
-def get_jail_info(jail_name: str) -> Optional[Dict[str, Any]]:
-    """Получить детальную информацию о jail."""  # ❌ Russian
-    logger.debug(f"Обработка jail '{jail_name}'")  # ❌ Russian
-    # Проверка существования jail  # ❌ Russian
-    if not jail_name:
-        return None
-    return jail_data
-```
-
 ### Running Linters
 
 ```bash
