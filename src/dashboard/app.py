@@ -22,6 +22,7 @@ from textual.reactive import reactive
 from textual.widgets import DataTable, Footer, Header, Label, Sparkline, Static, TabbedContent, TabPane
 
 from collectors import (
+    Fail2banCollector,
     NetworkCollector,
     ProcessesCollector,
     ServicesCollector,
@@ -107,6 +108,7 @@ class UTMDashboard(App):
         self.system_collector = SystemCollector(self.config)
         self.services_collector = ServicesCollector(self.config)
         self.network_collector = NetworkCollector(self.config)
+        self.fail2ban_collector = Fail2banCollector(self.config)
         self.tasks_collector = TasksCollector(self.config)
         self.processes_collector = ProcessesCollector(self.config)
         self.users_collector = UsersCollector(self.config)
@@ -155,7 +157,7 @@ class UTMDashboard(App):
                     yield NetworkExtendedTab(self.network_collector)
 
                 with TabPane("[b green]F[/] Fail2ban", id="fail2ban"):
-                    yield Fail2banTab(self.network_collector)
+                    yield Fail2banTab(self.fail2ban_collector)
 
                 with TabPane("[b green]7[/] Users", id="users"):
                     yield UsersTab(self.users_collector)

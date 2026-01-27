@@ -1,7 +1,7 @@
 """Network information collector."""
 
 import subprocess
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import psutil
 
@@ -15,7 +15,6 @@ from utils.binaries import (
 from utils.logger import get_logger
 
 from .base import BaseCollector
-from .fail2ban import Fail2banCollector
 
 logger = get_logger("network_collector")
 
@@ -25,7 +24,6 @@ class NetworkCollector(BaseCollector):
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
-        self.fail2ban = Fail2banCollector(config)
 
     def collect(self) -> Dict[str, Any]:
         """
@@ -42,7 +40,6 @@ class NetworkCollector(BaseCollector):
             'iptables': self._get_iptables_detailed(),
             'nftables': self._get_nftables_rules(),
             'routing': self._get_routing_table(),
-            'fail2ban': self.fail2ban.collect(),
         }
 
     def _get_interfaces(self) -> List[Dict[str, Any]]:
@@ -368,40 +365,3 @@ class NetworkCollector(BaseCollector):
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return [{'error': 'Unable to get routing table'}]
 
-    # Fail2ban delegation methods (for backward compatibility)
-
-    def ban_ip(self, ip: str, jail: str = 'recidive') -> bool:
-        """Ban an IP manually. Delegates to Fail2banCollector."""
-        return self.fail2ban.ban_ip(ip, jail)
-
-    def unban_ip(self, ip: str, jail: str = None) -> bool:
-        """Unban an IP manually. Delegates to Fail2banCollector."""
-        return self.fail2ban.unban_ip(ip, jail)
-
-    def run_f2b_analysis(self) -> str:
-        """Run fail2ban analysis. Delegates to Fail2banCollector."""
-        return self.fail2ban.run_analysis()
-
-    def get_whitelist(self) -> list:
-        """Get whitelist. Delegates to Fail2banCollector."""
-        return self.fail2ban.get_whitelist()
-
-    def add_to_whitelist(self, ip: str) -> bool:
-        """Add IP to whitelist. Delegates to Fail2banCollector."""
-        return self.fail2ban.add_to_whitelist(ip)
-
-    def remove_from_whitelist(self, ip: str) -> bool:
-        """Remove IP from whitelist. Delegates to Fail2banCollector."""
-        return self.fail2ban.remove_from_whitelist(ip)
-
-    def is_whitelisted(self, ip: str) -> bool:
-        """Check if IP is whitelisted. Delegates to Fail2banCollector."""
-        return self.fail2ban.is_whitelisted(ip)
-
-    def migrate_recidive_bans(self) -> tuple:
-        """Migrate recidive bans to 3-year bantime. Delegates to Fail2banCollector."""
-        return self.fail2ban.migrate_recidive_bans()
-
-    def cleanup(self) -> None:
-        """Cleanup temporary files. Delegates to Fail2banCollector."""
-        self.fail2ban.cleanup()

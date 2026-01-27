@@ -1,5 +1,6 @@
 """Fail2ban tab widget for the dashboard."""
 
+import time
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
@@ -12,7 +13,7 @@ from textual.coordinate import Coordinate
 from textual.timer import Timer
 from textual.widgets import DataTable, Input, Label, Static
 
-from collectors import NetworkCollector
+from collectors import Fail2banCollector
 from dashboard.widgets.analysis_modal import AnalysisModal
 from dashboard.widgets.confirm_modal import ConfirmModal
 from dashboard.widgets.whitelist_modal import WhitelistModal
@@ -103,7 +104,7 @@ class Fail2banTab(Vertical):
     }
     """
 
-    def __init__(self, collector: NetworkCollector):
+    def __init__(self, collector: Fail2banCollector):
         super().__init__()
         self.collector = collector
         self._last_data: Optional[Dict] = None
@@ -236,7 +237,7 @@ class Fail2banTab(Vertical):
         self.app.call_from_thread(show_analyzing)
 
         # Run analysis
-        output = self.collector.run_f2b_analysis()
+        output = self.collector.run_analysis()
 
         # Show results and switch to Slow tab
         def show_results():
@@ -248,12 +249,17 @@ class Fail2banTab(Vertical):
 
     def action_ban_ip(self) -> None:
         """Show confirmation and ban selected IP."""
+        t0 = time.time()
+        logger.info(f"[BAN DEBUG] +{0:.3f}s | action_ban_ip START")
+
         ip, jail = self._get_selected_ip_info()
+        logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | _get_selected_ip_info done: ip={ip}, jail={jail}")
 
         if not ip or ip in ('-', '?', ''):
             self.notify("No valid IP selected", severity="warning")
             return
 
+        logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Showing confirmation modal")
         # Show confirmation modal
         self.app.push_screen(
             ConfirmModal(
@@ -261,32 +267,45 @@ class Fail2banTab(Vertical):
                 message=f"Ban [bold red]{ip}[/bold red] permanently in recidive jail?",
                 confirm_label="Ban"
             ),
-            callback=lambda confirmed: self._do_ban_ip(ip, jail) if confirmed else None
+            callback=lambda confirmed: self._do_ban_ip(ip, jail, time.time()) if confirmed else None
         )
 
     @work(thread=True)
-    def _do_ban_ip(self, ip: str, jail: Optional[str]) -> None:
+    def _do_ban_ip(self, ip: str, jail: Optional[str], t0: float = None) -> None:
         """Execute ban operation in background."""
-        logger.info(f"Initiating ban for {ip}")
-        self.app.call_from_thread(self.notify, f"Banning {ip}...")
+        if t0 is None:
+            t0 = time.time()
+        logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | _do_ban_ip START (background thread)")
 
+        self.app.call_from_thread(self.notify, f"Banning {ip}...")
+        logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Notification sent, calling collector.ban_ip()")
+
+        t1 = time.time()
         success = self.collector.ban_ip(ip, jail='recidive')
+        logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | collector.ban_ip() done in {time.time()-t1:.3f}s, success={success}")
 
         if success:
-            logger.info(f"Banned {ip} permanently")
             self.app.call_from_thread(
                 self.notify, f"✓ Banned {ip} permanently", severity="information"
             )
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Success notification sent")
 
             # Remove from original jail if it was a temporary ban
             if jail and jail not in ('recidive', *VIRTUAL_JAILS):
+                logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Cleaning up from original jail: {jail}")
+                t2 = time.time()
                 if self.collector.unban_ip(ip, jail=jail):
-                    logger.debug(f"Cleaned up {ip} from {jail}")
+                    logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Cleanup done in {time.time()-t2:.3f}s")
 
             # Refresh to show updated state
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Starting update_data()")
+            t3 = time.time()
             self.update_data()
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | update_data() scheduled in {time.time()-t3:.3f}s")
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | _do_ban_ip COMPLETE, total time: {time.time()-t0:.3f}s")
         else:
             self._notify_error(f"Failed to ban {ip}")
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | _do_ban_ip FAILED")
 
     def action_unban_ip(self) -> None:
         """Show confirmation and unban selected IP."""
@@ -321,8 +340,8 @@ class Fail2banTab(Vertical):
             self.app.call_from_thread(
                 self.notify, f"✓ Unbanned {ip}", severity="information"
             )
-            # Immediate refresh to show updated state
-            self.app.call_from_thread(self.update_data)
+            # Refresh to show updated state
+            self.update_data()
         else:
             self._notify_error(f"Failed to unban {ip}")
 
@@ -375,7 +394,7 @@ class Fail2banTab(Vertical):
                 f"✓ Migrated {success}/{total} bans to 3 years",
                 severity="information"
             )
-            self.app.call_from_thread(self.update_data)
+            self.update_data()
 
     # === Search ===
 
@@ -459,11 +478,17 @@ class Fail2banTab(Vertical):
     @work(thread=True)
     def update_data(self) -> None:
         """Fetch data in background."""
+        t0 = time.time()
+        logger.info(f"[BAN DEBUG] +{0:.3f}s | update_data() START")
         try:
-            data = self.collector.update()
-            self._last_data = data
+            t1 = time.time()
+            f2b_data = self.collector.update()
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | collector.update() done in {time.time()-t1:.3f}s")
+            # Wrap in dict for compatibility with _update_view
+            self._last_data = {'fail2ban': f2b_data}
             self._last_update = datetime.now()
             self.app.call_from_thread(self._update_view)
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | update_data() COMPLETE")
         except Exception as e:
             logger.error(f"Failed to update fail2ban data: {e}", exc_info=True)
 

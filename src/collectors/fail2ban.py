@@ -120,6 +120,9 @@ class Fail2banCollector(BaseCollector):
         Returns:
             Dictionary with fail2ban status data
         """
+        t0 = time.time()
+        logger.info(f"[BAN DEBUG] +{0:.3f}s | collect() START")
+
         result = {
             'installed': False,
             'running': False,
@@ -128,12 +131,14 @@ class Fail2banCollector(BaseCollector):
         }
 
         try:
+            t1 = time.time()
             status_result = subprocess.run(
                 [FAIL2BAN_CLIENT, 'status'],
                 capture_output=True,
                 text=True,
                 timeout=10
             )
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | fail2ban-client status done in {time.time()-t1:.3f}s")
 
             if status_result.returncode != 0:
                 return result
@@ -143,13 +148,16 @@ class Fail2banCollector(BaseCollector):
 
             # Parse jail list
             jail_names = self._parse_jail_list(status_result.stdout)
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Found {len(jail_names)} jails: {jail_names}")
 
             # Collect active IPs for exclusion in history/slow bots
             active_ips: Set[str] = set()
             total_banned = 0
 
             for jail_name in jail_names:
+                t2 = time.time()
                 jail_info = self._get_jail_info(jail_name)
+                logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | _get_jail_info({jail_name}) done in {time.time()-t2:.3f}s")
                 if jail_info:
                     result['jails'].append(jail_info)
                     total_banned += jail_info.get('currently_banned', 0)
@@ -158,15 +166,22 @@ class Fail2banCollector(BaseCollector):
                             active_ips.add(ip_data['ip'])
 
             result['total_banned'] = total_banned
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | All jails processed, total_banned={total_banned}")
 
             # Add virtual jails (history and slow detector)
+            t3 = time.time()
             unbans_jail = self._get_recent_unbans(exclude_ips=active_ips)
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | _get_recent_unbans() done in {time.time()-t3:.3f}s")
             if unbans_jail:
                 result['jails'].append(unbans_jail)
 
+            t4 = time.time()
             slow_bots_jail = self._get_slow_bots_from_cache(exclude_ips=active_ips)
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | _get_slow_bots_from_cache() done in {time.time()-t4:.3f}s")
             if slow_bots_jail:
                 result['jails'].append(slow_bots_jail)
+
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | collect() COMPLETE, total: {time.time()-t0:.3f}s")
 
         except FileNotFoundError:
             logger.debug("fail2ban-client not found")
@@ -566,29 +581,39 @@ class Fail2banCollector(BaseCollector):
 
     def ban_ip(self, ip: str, jail: str = 'recidive') -> bool:
         """Ban an IP manually with 3-year bantime for recidive."""
+        t0 = time.time()
+        logger.info(f"[BAN DEBUG] +{0:.3f}s | collector.ban_ip() START ip={ip}, jail={jail}")
+
         if not is_valid_ip(ip):
-            logger.error(f"Invalid IP for ban: {ip}")
+            logger.error(f"[BAN DEBUG] Invalid IP for ban: {ip}")
             return False
+        logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | IP validation passed")
 
         try:
             # Set 3-year bantime for recidive jail
             if jail == 'recidive':
-                subprocess.run(
+                logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Setting bantime to {RECIDIVE_BANTIME}s (3 years)")
+                t1 = time.time()
+                result = subprocess.run(
                     [FAIL2BAN_CLIENT, 'set', jail, 'bantime', str(RECIDIVE_BANTIME)],
                     timeout=5,
                     capture_output=True
                 )
+                logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | set bantime done in {time.time()-t1:.3f}s, rc={result.returncode}")
 
-            subprocess.run(
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | Executing banip command")
+            t2 = time.time()
+            result = subprocess.run(
                 [FAIL2BAN_CLIENT, 'set', jail, 'banip', ip],
                 check=True,
                 timeout=5,
                 capture_output=True
             )
-            logger.info(f"Banned {ip} in {jail}")
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | banip done in {time.time()-t2:.3f}s, rc={result.returncode}")
+            logger.info(f"[BAN DEBUG] +{time.time()-t0:.3f}s | collector.ban_ip() SUCCESS, total: {time.time()-t0:.3f}s")
             return True
         except Exception as e:
-            logger.error(f"Failed to ban {ip}: {e}")
+            logger.error(f"[BAN DEBUG] +{time.time()-t0:.3f}s | FAILED: {e}")
             return False
 
     def migrate_recidive_bans(self) -> Tuple[int, int]:
