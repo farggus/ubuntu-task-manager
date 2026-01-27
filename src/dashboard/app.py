@@ -33,6 +33,7 @@ from collectors import (
 from dashboard.widgets.containers import ContainersTab
 from dashboard.widgets.disks import DisksTab
 from dashboard.widgets.fail2ban import Fail2banTab
+from dashboard.widgets.fail2ban_plus import Fail2banPlusTab
 from dashboard.widgets.logging import LoggingTab
 from dashboard.widgets.network import NetworkExtendedTab
 from dashboard.widgets.packages import PackagesTab
@@ -93,6 +94,7 @@ class UTMDashboard(App):
         Binding("5", "switch_tab('tasks')", "Tasks", show=False),
         Binding("6", "switch_tab('network')", "Network", show=False),
         Binding("F", "switch_tab('fail2ban')", "Fail2ban", show=False),
+        Binding("shift+f", "switch_tab('fail2ban_plus')", "Fail2ban+", show=False),
         Binding("7", "switch_tab('users')", "Users", show=False),
         Binding("8", "switch_tab('disks')", "Disks", show=False),
         Binding("0", "switch_tab('logging')", "Logging", show=False),
@@ -158,6 +160,9 @@ class UTMDashboard(App):
 
                 with TabPane("[b green]F[/] Fail2ban", id="fail2ban"):
                     yield Fail2banTab(self.fail2ban_collector)
+
+                with TabPane("[b cyan]F+[/] Fail2ban+", id="fail2ban_plus"):
+                    yield Fail2banPlusTab()
 
                 with TabPane("[b green]7[/] Users", id="users"):
                     yield UsersTab(self.users_collector)

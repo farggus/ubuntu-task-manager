@@ -1,0 +1,21 @@
+{
+    "version": "1.0",
+    "created_at": "2026-01-27T23:30:00Z",
+    "last_updated": "2026-01-27T23:30:00Z",
+    "stats": {
+        "total_ips": 0,
+        "total_attempts": 0,
+        "total_bans": 0,
+        "active_bans": 0,
+        "top_country": null,
+        "top_org": null
+    },
+    "metadata": {
+        "log_positions": {},
+        "last_full_sync": null,
+        "schema_version": "1.0"
+    },
+    "whitelist": [],
+    "blacklist": [],
+    "ips": {}
+}
