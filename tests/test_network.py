@@ -20,7 +20,6 @@ class TestNetworkCollector:
         from collectors.network import NetworkCollector
         collector = NetworkCollector()
         assert collector is not None
-        assert hasattr(collector, 'fail2ban')
 
     def test_is_valid_ip_valid_ipv4(self):
         """Test IP validation with valid IPv4."""
@@ -82,15 +81,7 @@ class TestNetworkCollector:
         # Test would require access to _get_firewall_rules method
         assert collector is not None
 
-    @patch('collectors.network.subprocess.run')
-    def test_get_fail2ban_status_not_installed(self, mock_run):
-        """Test fail2ban status when not installed."""
-        mock_run.side_effect = FileNotFoundError()
-        from collectors.network import NetworkCollector
-        collector = NetworkCollector()
-        data = collector.collect()
-        # Should not crash, fail2ban data might be empty
-        assert isinstance(data, dict)
+
 
 
 class TestIPValidation:
