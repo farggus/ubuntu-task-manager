@@ -613,8 +613,8 @@ class AttacksDatabase:
         with self._lock:
             return self._data["metadata"]["log_positions"].get(log_file)
     
-    def set_log_position(self, log_file: str, position: int, inode: int, 
-                         last_line: Optional[str] = None) -> None:
+    def set_log_position(self, log_file: str, position: int, 
+                         inode: int = 0, last_line: Optional[str] = None) -> None:
         """Save position for a log file."""
         with self._lock:
             self._data["metadata"]["log_positions"][log_file] = {

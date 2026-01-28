@@ -187,8 +187,9 @@ class Fail2banV2Collector(BaseCollector):
         stats = {'bans': 0, 'unbans': 0, 'attempts': 0, 'new_ips': 0}
         log_key = str(log_path)
         
-        # Get last known position (default to 0 if None)
-        last_position = self._db.get_log_position(log_key) or 0
+        # Get last known position (extract from dict if present)
+        pos_data = self._db.get_log_position(log_key)
+        last_position = pos_data.get('position', 0) if pos_data else 0
         current_position = 0
         
         # Open file (handle gzip)
