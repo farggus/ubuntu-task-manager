@@ -47,7 +47,7 @@ class AttacksDatabase:
         db.save()
     """
     
-    SCHEMA_VERSION = "1.0"
+    SCHEMA_VERSION = "2.0"
     
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -130,6 +130,8 @@ class AttacksDatabase:
                 "total_attempts": 0,
                 "total_bans": 0,
                 "active_bans": 0,
+                "threats_count": 0,
+                "evasion_active_count": 0,
                 "top_country": None,
                 "top_org": None
             },
@@ -191,16 +193,22 @@ class AttacksDatabase:
             "geo": {
                 "country": None,
                 "country_code": None,
+                "country_name": None,
                 "org": None,
                 "asn": None,
                 "city": None,
+                "region": None,
+                "is_vpn": None,
+                "is_datacenter": None,
                 "fetched_at": None
             },
             
             "attempts": {
                 "total": 0,
                 "by_jail": {},
-                "by_day": {}
+                "by_day": {},
+                "first_attempt": None,
+                "last_attempt": None
             },
             
             "bans": {
@@ -227,11 +235,16 @@ class AttacksDatabase:
                 "max_interval": None,
                 "attack_duration": None,
                 "attack_pattern": None,
+                "attack_series": [],
                 "priority": 3,
                 "evasion_detected": False,
+                "evasion_active": False,
+                "threat_detected": False,
+                "fails_before_ban": 0,
                 "last_analysis": None
             },
             
+            "user_comment": None,
             "notes": [],
             "custom": {}
         }
@@ -391,6 +404,23 @@ class AttacksDatabase:
                 "fetched_at": _now_iso()
             }
             record["last_updated"] = _now_unix()
+            self._dirty = True
+    
+    def set_user_comment(self, ip: str, comment: str) -> None:
+        """
+        Set user comment for an IP.
+        
+        Args:
+            ip: IP address
+            comment: User comment/note
+        """
+        with self._lock:
+            if ip not in self._data["ips"]:
+                self._data["ips"][ip] = self._create_empty_ip_record()
+                self._data["stats"]["total_ips"] += 1
+            
+            self._data["ips"][ip]["user_comment"] = comment
+            self._data["ips"][ip]["last_updated"] = _now_unix()
             self._dirty = True
     
     # =========================================================================
