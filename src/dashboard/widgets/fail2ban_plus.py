@@ -5,7 +5,7 @@ The actual database management is in the F2BDatabaseModal.
 """
 
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 from textual import work
 from textual.app import ComposeResult
@@ -64,11 +64,12 @@ class Fail2banPlusTab(Vertical, can_focus=True):
         """Build the UI."""
         with Horizontal(id="f2b_plus_header_container"):
             yield Label("[bold cyan]Loading database...[/bold cyan]", id="f2b_plus_header")
-            yield Input(placeholder="Search IP...", id="f2b_plus_search")
+            yield Input(placeholder="Search IP/jail...", id="f2b_plus_search")
     
     def on_mount(self) -> None:
         """Load initial data."""
         self._db = AttacksDatabase()
+        self._last_update = datetime.now()
         self._update_header()
     
     def action_open_db_modal(self) -> None:
@@ -93,7 +94,7 @@ class Fail2banPlusTab(Vertical, can_focus=True):
             logger.error(f"Failed to refresh database: {e}")
     
     def _update_header(self) -> None:
-        """Update header with database stats."""
+        """Update header with database stats (same format as Fail2ban tab)."""
         try:
             header = self.query_one("#f2b_plus_header", Label)
             
@@ -102,29 +103,55 @@ class Fail2banPlusTab(Vertical, can_focus=True):
                 return
             
             stats = self._db.get_stats()
-            total_ips = stats.get('total_ips', 0)
-            total_attempts = stats.get('total_attempts', 0)
-            total_bans = stats.get('total_bans', 0)
-            active_bans = stats.get('active_bans', 0)
-            top_country = stats.get('top_country', 'N/A')
+            all_ips = self._db.get_all_ips()
             
-            # Line 1: Database status
+            # Count unique jails from all IPs
+            all_jails: Set[str] = set()
+            jails_with_bans: Set[str] = set()
+            
+            total_banned = 0
+            unbanned_count = 0
+            threats_count = 0
+            
+            for ip, data in all_ips.items():
+                # Collect jails
+                by_jail = data.get('attempts', {}).get('by_jail', {})
+                all_jails.update(by_jail.keys())
+                
+                # Count active bans per jail
+                if data.get('bans', {}).get('active'):
+                    total_banned += 1
+                    current_jail = data.get('bans', {}).get('current_jail')
+                    if current_jail:
+                        jails_with_bans.add(current_jail)
+                
+                # Count unbanned (total bans - active)
+                unbanned_count += data.get('unbans', {}).get('total', 0)
+                
+                # Count threats (danger_score >= 50)
+                if data.get('danger_score', 0) >= 50:
+                    threats_count += 1
+            
+            jails_count = len(all_jails) if all_jails else 0
+            active_jails = len(jails_with_bans)
+            
+            # Line 1: Fail2ban: Running │ X jails │ Y banned │ Z unbanned │ W threats
             line1 = (
-                f"[bold cyan]F2B+ Database:[/bold cyan] [green]Loaded[/green] │ "
-                f"[white]{total_ips}[/white] IPs │ "
-                f"[yellow]{total_attempts}[/yellow] attempts │ "
-                f"[red]{total_bans}[/red] bans │ "
-                f"[magenta]{active_bans}[/magenta] active"
+                f"[bold cyan]Fail2ban:[/bold cyan] [green]Running[/green] │ "
+                f"[white]{jails_count}[/white] jails │ "
+                f"[red]{total_banned}[/red] banned │ "
+                f"[blue]{unbanned_count}[/blue] unbanned │ "
+                f"[yellow]{threats_count}[/yellow] threats"
             )
             
-            # Line 2: Top country + update time
+            # Line 2: Active: X/Y jails with bans │ Updated: HH:MM:SS
             update_time = ""
             if self._last_update:
                 update_time = f"[dim]Updated: {self._last_update.strftime('%H:%M:%S')}[/dim]"
-            else:
-                update_time = "[dim]Loaded from disk[/dim]"
             
-            line2 = f"[cyan]Top:[/cyan] {top_country} │ {update_time}"
+            line2 = f"[cyan]Active:[/cyan] {active_jails}/{jails_count} jails with bans"
+            if update_time:
+                line2 = f"{line2} │ {update_time}"
             
             header.update(f"{line1}\n{line2}")
             
