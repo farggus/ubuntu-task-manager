@@ -14,7 +14,6 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Label, Static
 
-from collectors.fail2ban_v2 import Fail2banV2Collector
 from database.attacks_db import AttacksDatabase
 from utils.logger import get_logger
 
@@ -38,13 +37,13 @@ class Fail2banPlusTab(Vertical):
         Binding("t", "test_collection", "Test Collection"),
         Binding("m", "migrate_data", "Migrate Data"),
         Binding("s", "show_stats", "Show Stats"),
+        Binding("d", "open_db_modal", "F2B Database"),
     ]
     
     def __init__(self):
         """Initialize Fail2Ban+ tab."""
         super().__init__()
         self._db: Optional[AttacksDatabase] = None
-        self._collector: Optional[Fail2banV2Collector] = None
         self._last_result: str = "Not run yet"
     
     def compose(self) -> ComposeResult:
@@ -52,10 +51,11 @@ class Fail2banPlusTab(Vertical):
         yield Label("🛡️ Fail2Ban+ (v2 Testing)", id="f2b-plus-header", classes="header")
         
         with Horizontal(id="f2b-plus-controls"):
-            yield Button("▶ Parse Logs", id="btn-test", variant="primary")
-            yield Button("🔄 Full Parse", id="btn-full", variant="warning")
+            yield Button("▶ Test Collection", id="btn-test", variant="primary")
+            yield Button("📥 Migrate from Cache", id="btn-migrate", variant="default")
             yield Button("📊 Show Stats", id="btn-stats", variant="default")
             yield Button("💾 Save DB", id="btn-save", variant="success")
+            yield Button("🗄️ F2B-db", id="btn-db-modal", variant="warning")
         
         yield Label("Status: Ready", id="f2b-plus-status", classes="status-label")
         
@@ -63,9 +63,8 @@ class Fail2banPlusTab(Vertical):
     
     def on_mount(self) -> None:
         """Initialize on mount."""
-        # Initialize database and collector
+        # Initialize database
         self._db = AttacksDatabase()
-        self._collector = Fail2banV2Collector(db=self._db)
         
         # Setup table
         table = self.query_one("#f2b-plus-table", DataTable)
@@ -73,7 +72,7 @@ class Fail2banPlusTab(Vertical):
         table.cursor_type = "row"
         table.zebra_stripes = True
         
-        self._update_status("Database loaded. Ready for log parsing.")
+        self._update_status("Database loaded. Ready for testing.")
         self._refresh_table()
     
     @on(Button.Pressed, "#btn-test")
@@ -81,10 +80,10 @@ class Fail2banPlusTab(Vertical):
         """Handle test button click."""
         self.action_test_collection()
     
-    @on(Button.Pressed, "#btn-full")
-    def on_full_parse_button(self) -> None:
-        """Handle full parse button click."""
-        self.action_full_parse()
+    @on(Button.Pressed, "#btn-migrate")
+    def on_migrate_button(self) -> None:
+        """Handle migrate button click."""
+        self.action_migrate_data()
     
     @on(Button.Pressed, "#btn-stats")
     def on_stats_button(self) -> None:
@@ -96,67 +95,94 @@ class Fail2banPlusTab(Vertical):
         """Handle save button click."""
         self.action_save_db()
     
+    @on(Button.Pressed, "#btn-db-modal")
+    def on_db_modal_button(self) -> None:
+        """Handle F2B-db button click."""
+        self.action_open_db_modal()
+    
+    def action_open_db_modal(self) -> None:
+        """Open the F2B Database Manager modal."""
+        from dashboard.widgets.f2b_db_manage_modal import F2BDatabaseModal
+        self.app.push_screen(F2BDatabaseModal())
+    
     def action_test_collection(self) -> None:
-        """Run incremental log parsing."""
-        self._update_status("🔄 Parsing fail2ban logs...")
-        self._do_parse_logs()
+        """Test data collection into new database."""
+        self._update_status("🔄 Running test collection...")
+        self._do_test_collection()
     
     @work(thread=True)
-    def _do_parse_logs(self) -> None:
-        """Background worker for log parsing."""
-        try:
-            if not self._collector:
-                self._db = AttacksDatabase()
-                self._collector = Fail2banV2Collector(db=self._db)
-            
-            # Run collection (incremental parse)
-            result = self._collector.collect()
-            
-            if result.get('success'):
-                msg = (f"✅ Parsed in {result['parse_time']:.2f}s: "
-                       f"{result['bans_found']} bans, "
-                       f"{result['unbans_found']} unbans, "
-                       f"{result['attempts_found']} attempts, "
-                       f"{result['new_ips']} new IPs")
-            else:
-                msg = f"❌ Parse failed: {result.get('error', 'Unknown error')}"
-            
-            self.app.call_from_thread(self._update_status, msg)
-            self.app.call_from_thread(self._refresh_table)
-            
-            logger.info(msg)
-            
-        except Exception as e:
-            logger.error(f"Log parsing failed: {e}")
-            self.app.call_from_thread(
-                self._update_status,
-                f"❌ Error: {str(e)}"
-            )
-    
-    def action_full_parse(self) -> None:
-        """Force full parse of all logs (reset positions)."""
-        self._update_status("🔄 Full parse - resetting positions...")
-        self._do_full_parse()
-    
-    @work(thread=True)
-    def _do_full_parse(self) -> None:
-        """Background worker for full parse."""
+    def _do_test_collection(self) -> None:
+        """Background worker for test collection."""
         t0 = time.time()
         
         try:
-            if not self._collector:
+            if not self._db:
                 self._db = AttacksDatabase()
-                self._collector = Fail2banV2Collector(db=self._db)
             
-            # Force full parse
-            stats = self._collector.parse_full(reset_positions=True)
+            # Simulate collecting some test data
+            # In real implementation, this would parse fail2ban logs
+            test_ips = [
+                ("192.168.1.100", "Test Country", "Test Org", 10),
+                ("10.0.0.1", "Another Country", "Another Org", 5),
+            ]
+            
+            for ip, country, org, attempts in test_ips:
+                for _ in range(attempts):
+                    self._db.record_attempt(ip, "sshd")
+                self._db.set_geo(ip, country, org)
+            
+            # Recalculate
+            self._db.recalculate_stats()
+            self._db.recalculate_danger_scores()
+            
             duration = time.time() - t0
             
-            msg = (f"✅ Full parse in {duration:.2f}s: "
-                   f"{stats['bans']} bans, "
-                   f"{stats['unbans']} unbans, "
-                   f"{stats['attempts']} attempts, "
-                   f"{stats['new_ips']} new IPs")
+            # Update UI on main thread
+            self.app.call_from_thread(
+                self._update_status,
+                f"✅ Test collection completed in {duration:.2f}s. Added {len(test_ips)} test IPs."
+            )
+            self.app.call_from_thread(self._refresh_table)
+            
+            logger.info(f"Test collection completed in {duration:.2f}s")
+            
+        except Exception as e:
+            logger.error(f"Test collection failed: {e}")
+            self.app.call_from_thread(
+                self._update_status,
+                f"❌ Error: {str(e)}"
+            )
+    
+    def action_migrate_data(self) -> None:
+        """Migrate data from old cache files."""
+        self._update_status("🔄 Migrating from cache files...")
+        self._do_migrate()
+    
+    @work(thread=True)
+    def _do_migrate(self) -> None:
+        """Background worker for migration."""
+        t0 = time.time()
+        
+        try:
+            if not self._db:
+                self._db = AttacksDatabase()
+            
+            if not CACHE_DIR.exists():
+                self.app.call_from_thread(
+                    self._update_status,
+                    f"❌ Cache directory not found: {CACHE_DIR}"
+                )
+                return
+            
+            stats = self._db.migrate_from_cache(CACHE_DIR)
+            self._db.save()
+            
+            duration = time.time() - t0
+            
+            msg = (f"✅ Migration completed in {duration:.2f}s. "
+                   f"IPs: {stats['ips_migrated']}, "
+                   f"Geo: {stats['geo_migrated']}, "
+                   f"Whitelist: {stats['whitelist_migrated']}")
             
             self.app.call_from_thread(self._update_status, msg)
             self.app.call_from_thread(self._refresh_table)
@@ -164,13 +190,11 @@ class Fail2banPlusTab(Vertical):
             logger.info(msg)
             
         except Exception as e:
-            logger.error(f"Full parse failed: {e}")
+            logger.error(f"Migration failed: {e}")
             self.app.call_from_thread(
                 self._update_status,
-                f"❌ Error: {str(e)}"
+                f"❌ Migration error: {str(e)}"
             )
-    
-
     
     def action_show_stats(self) -> None:
         """Show database statistics."""
