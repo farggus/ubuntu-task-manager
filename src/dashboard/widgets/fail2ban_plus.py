@@ -93,10 +93,19 @@ class Fail2banPlusTab(Vertical, can_focus=True):
     
     @work(thread=True)
     def _refresh_data(self) -> None:
-        """Reload all data in background."""
+        """Reload all data in background (auto-parse logs)."""
         try:
-            # Refresh database
+            # Initialize/refresh database
             self._db = AttacksDatabase()
+            
+            # Auto-parse logs to populate/update database
+            from collectors.fail2ban_v2 import Fail2banV2Collector
+            collector = Fail2banV2Collector(db=self._db)
+            parse_stats = collector.collect()
+            logger.info(f"Auto-parsed logs: {parse_stats}")
+            
+            # Save database after parsing
+            self._db.save()
             
             # Get real-time data from fail2ban-client
             if not self._f2b_client:
