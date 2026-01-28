@@ -10,7 +10,7 @@ from textual.containers import Vertical
 from textual.widgets import Static
 
 
-class Fail2banPlusTab(Vertical):
+class Fail2banPlusTab(Vertical, can_focus=True):
     """
     Fail2Ban+ tab - placeholder with keybinding to open database modal.
     """
@@ -22,6 +22,10 @@ class Fail2banPlusTab(Vertical):
     def compose(self) -> ComposeResult:
         """Build the UI."""
         yield Static("")
+    
+    def on_mount(self) -> None:
+        """Focus this widget on mount."""
+        self.focus()
     
     def action_open_db_modal(self) -> None:
         """Open the F2B Database Manager modal."""
