@@ -140,6 +140,7 @@ class Fail2banPlusTab(Vertical, can_focus=True):
             
             if self._db:
                 all_ips = self._db.get_all_ips()
+                logger.debug(f"Loaded {len(all_ips)} IPs from database")
                 
                 for ip, data in all_ips.items():
                     # Unbanned = IPs with bans.total > 0 but not currently active
@@ -155,6 +156,8 @@ class Fail2banPlusTab(Vertical, can_focus=True):
                     # Currently evading
                     if analysis.get('evasion_active'):
                         evasion_count += 1
+                
+                logger.debug(f"Calculated: unbanned={unbanned_count}, threats={threats_count}, evasion={evasion_count}")
             
             # === Build header ===
             # Line 1: Fail2ban: Running │ X jails │ Y banned │ Z unbanned │ W threats
