@@ -23,10 +23,6 @@ class Fail2banPlusTab(Vertical, can_focus=True):
         """Build the UI."""
         yield Static("")
     
-    def on_mount(self) -> None:
-        """Focus this widget on mount."""
-        self.focus()
-    
     def action_open_db_modal(self) -> None:
         """Open the F2B Database Manager modal."""
         from dashboard.widgets.f2b_db_manage_modal import F2BDatabaseModal
