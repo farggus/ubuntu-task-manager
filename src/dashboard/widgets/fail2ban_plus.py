@@ -1,11 +1,13 @@
 """
 Fail2ban+ tab widget - New implementation with unified attacks database.
 
-The actual database management is in the F2BDatabaseModal.
+Uses hybrid data sources:
+- Fail2banClient: real-time jail status, active bans
+- AttacksDatabase: historical analytics, threats, unbanned IPs
 """
 
 from datetime import datetime
-from typing import Dict, Optional, Set
+from typing import Dict, Optional
 
 from textual import work
 from textual.app import ComposeResult
@@ -13,6 +15,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Input, Label
 
+from collectors.fail2ban_client import Fail2banClient
 from database.attacks_db import AttacksDatabase
 from utils.logger import get_logger
 
@@ -22,6 +25,10 @@ logger = get_logger("fail2ban_plus")
 class Fail2banPlusTab(Vertical, can_focus=True):
     """
     Fail2Ban+ tab with unified attacks database.
+    
+    Hybrid data sources:
+    - Real-time: jails, banned IPs (from fail2ban-client)
+    - Analytics: threats, unbanned, history (from AttacksDatabase)
     """
     
     BINDINGS = [
@@ -58,19 +65,20 @@ class Fail2banPlusTab(Vertical, can_focus=True):
     def __init__(self):
         super().__init__()
         self._db: Optional[AttacksDatabase] = None
+        self._f2b_client: Optional[Fail2banClient] = None
         self._last_update: Optional[datetime] = None
     
     def compose(self) -> ComposeResult:
         """Build the UI."""
         with Horizontal(id="f2b_plus_header_container"):
-            yield Label("[bold cyan]Loading database...[/bold cyan]", id="f2b_plus_header")
+            yield Label("[bold cyan]Loading...[/bold cyan]", id="f2b_plus_header")
             yield Input(placeholder="Search IP/jail...", id="f2b_plus_search")
     
     def on_mount(self) -> None:
         """Load initial data."""
         self._db = AttacksDatabase()
-        self._last_update = datetime.now()
-        self._update_header()
+        self._f2b_client = Fail2banClient()
+        self._refresh_data()
     
     def action_open_db_modal(self) -> None:
         """Open the F2B Database Manager modal."""
@@ -81,67 +89,82 @@ class Fail2banPlusTab(Vertical, can_focus=True):
         """Manual refresh action."""
         header = self.query_one("#f2b_plus_header", Label)
         header.update("[bold yellow]⟳ Refreshing...[/bold yellow]")
-        self._refresh_db()
+        self._refresh_data()
     
     @work(thread=True)
-    def _refresh_db(self) -> None:
-        """Reload database in background."""
+    def _refresh_data(self) -> None:
+        """Reload all data in background."""
         try:
+            # Refresh database
             self._db = AttacksDatabase()
+            
+            # Get real-time data from fail2ban-client
+            if not self._f2b_client:
+                self._f2b_client = Fail2banClient()
+            
             self._last_update = datetime.now()
             self.app.call_from_thread(self._update_header)
         except Exception as e:
-            logger.error(f"Failed to refresh database: {e}")
+            logger.error(f"Failed to refresh data: {e}")
+            self.app.call_from_thread(self._show_error, str(e))
+    
+    def _show_error(self, message: str) -> None:
+        """Show error in header."""
+        try:
+            header = self.query_one("#f2b_plus_header", Label)
+            header.update(f"[red]Error: {message}[/red]")
+        except Exception:
+            pass
     
     def _update_header(self) -> None:
-        """Update header with database stats (same format as Fail2ban tab)."""
+        """Update header with hybrid data (fail2ban-client + AttacksDatabase)."""
         try:
             header = self.query_one("#f2b_plus_header", Label)
             
-            if not self._db:
-                header.update("[red]Database not loaded[/red]")
-                return
+            # === Real-time data from fail2ban-client ===
+            f2b_summary = {}
+            if self._f2b_client:
+                f2b_summary = self._f2b_client.get_summary()
             
-            stats = self._db.get_stats()
-            all_ips = self._db.get_all_ips()
+            is_running = f2b_summary.get("running", False)
+            jails_count = f2b_summary.get("jails_count", 0)
+            jails_with_bans = f2b_summary.get("jails_with_bans", 0)
+            total_banned = f2b_summary.get("total_banned", 0)
             
-            # Count unique jails from all IPs
-            all_jails: Set[str] = set()
-            jails_with_bans: Set[str] = set()
+            status_str = "[green]Running[/green]" if is_running else "[red]Stopped[/red]"
             
-            total_banned = 0
+            # === Analytics from AttacksDatabase ===
             unbanned_count = 0
             threats_count = 0
+            evasion_count = 0
             
-            for ip, data in all_ips.items():
-                # Collect jails
-                by_jail = data.get('attempts', {}).get('by_jail', {})
-                all_jails.update(by_jail.keys())
+            if self._db:
+                all_ips = self._db.get_all_ips()
                 
-                # Count active bans per jail
-                if data.get('bans', {}).get('active'):
-                    total_banned += 1
-                    current_jail = data.get('bans', {}).get('current_jail')
-                    if current_jail:
-                        jails_with_bans.add(current_jail)
-                
-                # Count unbanned (total bans - active)
-                unbanned_count += data.get('unbans', {}).get('total', 0)
-                
-                # Count threats (danger_score >= 50)
-                if data.get('danger_score', 0) >= 50:
-                    threats_count += 1
+                for ip, data in all_ips.items():
+                    # Unbanned = IPs with bans.total > 0 but not currently active
+                    bans = data.get('bans', {})
+                    if bans.get('total', 0) > 0 and not bans.get('active'):
+                        unbanned_count += 1
+                    
+                    # Threats = threat_detected or evasion_active
+                    analysis = data.get('analysis', {})
+                    if analysis.get('threat_detected') or analysis.get('evasion_detected'):
+                        threats_count += 1
+                    
+                    # Currently evading
+                    if analysis.get('evasion_active'):
+                        evasion_count += 1
             
-            jails_count = len(all_jails) if all_jails else 0
-            active_jails = len(jails_with_bans)
-            
+            # === Build header ===
             # Line 1: Fail2ban: Running │ X jails │ Y banned │ Z unbanned │ W threats
+            evasion_alert = f" │ [bold red blink]{evasion_count} EVADING[/bold red blink]" if evasion_count else ""
             line1 = (
-                f"[bold cyan]Fail2ban:[/bold cyan] [green]Running[/green] │ "
+                f"[bold cyan]Fail2ban:[/bold cyan] {status_str} │ "
                 f"[white]{jails_count}[/white] jails │ "
                 f"[red]{total_banned}[/red] banned │ "
                 f"[blue]{unbanned_count}[/blue] unbanned │ "
-                f"[yellow]{threats_count}[/yellow] threats"
+                f"[yellow]{threats_count}[/yellow] threats{evasion_alert}"
             )
             
             # Line 2: Active: X/Y jails with bans │ Updated: HH:MM:SS
@@ -149,7 +172,7 @@ class Fail2banPlusTab(Vertical, can_focus=True):
             if self._last_update:
                 update_time = f"[dim]Updated: {self._last_update.strftime('%H:%M:%S')}[/dim]"
             
-            line2 = f"[cyan]Active:[/cyan] {active_jails}/{jails_count} jails with bans"
+            line2 = f"[cyan]Active:[/cyan] {jails_with_bans}/{jails_count} jails with bans"
             if update_time:
                 line2 = f"{line2} │ {update_time}"
             
