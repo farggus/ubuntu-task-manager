@@ -99,6 +99,10 @@ class Fail2banV2Collector(BaseCollector):
             result['logs_parsed'] = stats.get('logs_parsed', [])
             result['success'] = True
             
+            # Sync active bans with fail2ban-client (real-time state)
+            sync_stats = self._sync_with_fail2ban()
+            result['synced_active'] = sync_stats.get('synced', 0)
+            
             # Save database
             self._db.save()
             
@@ -354,3 +358,67 @@ class Fail2banV2Collector(BaseCollector):
         self._db.save()
         
         return stats
+    
+    def _sync_with_fail2ban(self) -> Dict[str, int]:
+        """
+        Sync active bans with fail2ban-client (real-time state).
+        
+        This corrects the 'active' flag in database based on actual
+        fail2ban state, not just log events.
+        
+        Returns:
+            Dict with sync statistics
+        """
+        from collectors.fail2ban_client import Fail2banClient
+        
+        stats = {'synced': 0, 'activated': 0, 'deactivated': 0}
+        
+        try:
+            client = Fail2banClient()
+            if not client.is_running():
+                logger.warning("Fail2ban not running, skipping sync")
+                return stats
+            
+            # Get all currently banned IPs from fail2ban
+            banned_ips = client.get_all_banned_ips()  # {jail: [ips]}
+            all_banned = set()
+            for jail, ips in banned_ips.items():
+                all_banned.update(ips)
+            
+            logger.debug(f"Syncing {len(all_banned)} active bans from fail2ban")
+            
+            # Update database
+            all_db_ips = self._db.get_all_ips()
+            for ip, data in all_db_ips.items():
+                bans = data.get('bans', {})
+                is_active_in_db = bans.get('active', False)
+                is_active_real = ip in all_banned
+                
+                if is_active_in_db != is_active_real:
+                    # Need to update
+                    if is_active_real:
+                        # Mark as active
+                        self._db._data['ips'][ip]['bans']['active'] = True
+                        stats['activated'] += 1
+                    else:
+                        # Mark as inactive
+                        self._db._data['ips'][ip]['bans']['active'] = False
+                        stats['deactivated'] += 1
+                    stats['synced'] += 1
+            
+            # Also add any banned IPs not in DB yet
+            for ip in all_banned:
+                if ip not in all_db_ips:
+                    self._db._data['ips'][ip] = self._db._create_empty_ip_record()
+                    self._db._data['ips'][ip]['bans']['active'] = True
+                    stats['synced'] += 1
+                    stats['activated'] += 1
+            
+            self._db._dirty = True
+            logger.info(f"Synced active bans: {stats['activated']} activated, {stats['deactivated']} deactivated")
+            
+        except Exception as e:
+            logger.error(f"Failed to sync with fail2ban: {e}")
+        
+        return stats
+
