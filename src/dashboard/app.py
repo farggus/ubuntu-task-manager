@@ -213,9 +213,18 @@ class UTMDashboard(App):
         """Toggle the visibility of the system information widget."""
         try:
             system_info = self.query_one(CompactSystemInfo)
-            system_info.display = not system_info.display
+            
+            # Toggle using styles.display for better compatibility
+            if system_info.styles.display == "none":
+                system_info.styles.display = "block"
+                # self.notify("System Info: Shown") # Optional feedback
+            else:
+                system_info.styles.display = "none"
+                # self.notify("System Info: Hidden") # Optional feedback
+                
         except Exception as e:
-            logger.debug(f"Could not toggle system info: {e}")
+            logger.error(f"Could not toggle system info: {e}")
+            self.notify(f"Toggle Error: {e}", severity="error")
 
     def action_switch_tab(self, tab_id: str) -> None:
         tabs = self.query_one(TabbedContent)
