@@ -69,7 +69,7 @@ def main():
         print(f"Create a config.yaml file from the example to customize settings.")
 
     try:
-        logger.info(f"Starting {APP_NAME}")
+        logger.info(f"========== Starting {APP_NAME} ==========")
         # Run the dashboard
         app = UTMDashboard(config_path=str(config_path))
         app.run()

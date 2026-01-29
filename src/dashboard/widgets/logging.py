@@ -54,11 +54,17 @@ class LoggingTab(Vertical):
     }
 
     #log_search {
-        width: 1fr;
+        width: 30;
         margin-left: 2;
         border: none;
         background: transparent;
         color: $text;
+    }
+    
+    .log-file-label {
+        margin-left: 2;
+        width: 1fr;
+        color: $text-disabled;
     }
 
     #log_toolbar {
@@ -110,6 +116,7 @@ class LoggingTab(Vertical):
         with Horizontal(id="log_header_container"):
             yield Label("[bold cyan]Loading logs...[/bold cyan]", id="log_header")
             yield Input(placeholder="Search logs...", id="log_search")
+            yield Label(f" Log Path: {LOG_FILE}", classes="log-file-label")
 
         with Horizontal(id="log_toolbar"):
             yield Select(
@@ -120,7 +127,6 @@ class LoggingTab(Vertical):
             )
 
         yield RichLog(id="log_view", highlight=True, markup=True)
-        yield Label(f"[dim]{LOG_FILE}[/dim]", classes="help-text")
 
     def on_mount(self) -> None:
         """Initialize log view and start updates."""
@@ -376,7 +382,12 @@ class LoggingTab(Vertical):
             "ERROR": "red",
             "CRITICAL": "bold red",
         }
-        color = color_map.get(level, "white")
+        
+        # Special case for startup message
+        if "========== Starting Ubuntu Task Manager ==========" in line:
+            color = "white"
+        else:
+            color = color_map.get(level, "white")
 
         escaped_line = escape(line)
 

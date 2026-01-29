@@ -29,8 +29,8 @@ def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
     else:
         handler = RotatingFileHandler(
             log_file,
-            maxBytes=5 * 1024 * 1024,
-            backupCount=3,
+            maxBytes=1 * 1024 * 1024,  # 1 MB
+            backupCount=10,
             encoding='utf-8'
         )
     
