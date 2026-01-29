@@ -71,7 +71,6 @@ class ProcessesTab(Vertical):
         table = self.query_one(DataTable)
         table.add_columns("PID", "Name", "User", "Status", "CPU%", "Mem%", "Parent", "Command")
         self.update_data()
-        self.set_interval(5, self.update_data)
 
     def action_view_all(self) -> None:
         """Switch to 'all' processes view."""

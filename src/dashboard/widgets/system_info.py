@@ -23,7 +23,6 @@ class CompactSystemInfo(Horizontal):
     DEFAULT_CSS = """
     CompactSystemInfo {
         height: 14;
-        dock: top;
         padding: 0 0;
         padding-bottom: 0;
         border: solid magenta;
@@ -117,6 +116,8 @@ class CompactSystemInfo(Horizontal):
         self.freq_history: deque = deque(maxlen=60)
         self.mem_history: deque = deque(maxlen=60)
         self.swap_history: deque = deque(maxlen=60)
+        self.os_name = "Loading..."
+        self._clock_timer = None
 
     def compose(self):
         # Column 1: Overview
@@ -161,8 +162,41 @@ class CompactSystemInfo(Horizontal):
         interval = getattr(self.app, 'update_interval', 2000)
         self.border_subtitle = f"[dim]-[/dim] [bold cyan]{interval}[/bold cyan] [dim]+[/dim]"
 
+        # Initial fetch of OS info
+        self._fetch_initial_os_info()
+
+        # Start clock timer (independent of data update)
+        self.update_header_clock()
+        self._clock_timer = self.set_interval(1.0, self.update_header_clock)
+
         self.update_data()
-        self.set_interval(5, self.update_data)
+        # Use initial interval from app (convert ms to seconds)
+        self._update_timer = self.set_interval(interval / 1000, self.update_data)
+
+    @work(thread=True)
+    def _fetch_initial_os_info(self) -> None:
+        """Fetch OS info once asynchronously."""
+        try:
+            os_info = self.collector._get_os_info()
+            self.os_name = os_info.get('pretty_name', 'Linux')
+            # Trigger immediate header update
+            self.app.call_from_thread(self.update_header_clock)
+        except Exception as e:
+            logger.debug(f"Failed to fetch initial OS info: {e}")
+
+    def update_header_clock(self) -> None:
+        """Update header with current time and OS info."""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.border_title = f"[dim]^S[/dim] [bold magenta]System Information | {self.os_name} | {timestamp}[/bold magenta]"
+
+    def update_timer_interval(self, interval_ms: int) -> None:
+        """Update the refresh timer with new interval."""
+        if hasattr(self, '_update_timer'):
+            self._update_timer.stop()
+        
+        # Convert ms to seconds for set_interval
+        self._update_timer = self.set_interval(interval_ms / 1000, self.update_data)
+        logger.debug(f"System info interval updated to {interval_ms}ms")
 
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:
@@ -177,11 +211,7 @@ class CompactSystemInfo(Horizontal):
         if not data:
             return
 
-        # Border Title
-        os_info = data.get('os', {})
-        os_name = os_info.get('pretty_name', 'Linux')
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.border_title = f"[bold magenta]System Information | {os_name} | {timestamp}[/bold magenta]"
+        # Border title is handled by update_header_clock
 
         # Update interval display
         interval = getattr(self.app, 'update_interval', 2000)

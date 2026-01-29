@@ -30,6 +30,10 @@ class SystemCollector(BaseCollector):
         self._last_io_time = time.time()
         self._pkg_cache = {'total': 0, 'updates': 0}
         self._pkg_cache_time = 0
+        
+        # Initialize CPU percent counters
+        psutil.cpu_percent(interval=0, percpu=True)
+        psutil.cpu_percent(interval=0)
 
     def collect(self) -> Dict[str, Any]:
         """
@@ -262,8 +266,9 @@ class SystemCollector(BaseCollector):
                 'min': round(cpu_freq.min, 2) if cpu_freq else 0,
                 'max': round(cpu_freq.max, 2) if cpu_freq else 0,
             },
-            'usage_per_core': [round(x, 1) for x in psutil.cpu_percent(interval=1, percpu=True)],
-            'usage_total': round(psutil.cpu_percent(interval=1), 1),
+            # Use interval=0 for non-blocking calls (first call returns 0)
+            'usage_per_core': [round(x, 1) for x in psutil.cpu_percent(interval=0, percpu=True)],
+            'usage_total': round(psutil.cpu_percent(interval=0), 1),
             'temperature': temp
         }
 

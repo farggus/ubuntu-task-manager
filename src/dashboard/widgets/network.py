@@ -80,7 +80,6 @@ class NetworkExtendedTab(Vertical):
         """Setup table and start updates."""
         self._setup_table_columns()
         self.update_data()
-        self.set_interval(60, self.update_data)
 
     def _setup_table_columns(self) -> None:
         """Setup table columns based on current view mode."""

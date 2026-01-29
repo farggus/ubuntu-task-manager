@@ -72,10 +72,15 @@ class ContainersTab(Vertical):
         yield DataTable(id="containers_table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        table = self.query_one(DataTable)
-        table.add_columns("ID", "Name", "Stack", "Image", "Status", "IP Address", "Ports")
+        """Setup table and start updates."""
+        self._setup_table_columns()
         self.update_data()
-        self.set_interval(15, self.update_data)
+
+    def _setup_table_columns(self) -> None:
+        """Setup table columns."""
+        table = self.query_one(DataTable)
+        table.clear(columns=True)
+        table.add_columns("ID", "Name", "Stack", "Image", "Status", "IP Address", "Ports")
 
     def action_view_all(self):
         self._set_view_mode('all', "Showing all containers")

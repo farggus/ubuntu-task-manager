@@ -71,7 +71,6 @@ class ServicesTab(Vertical):
         table.add_column("Description")
         
         self.update_data()
-        self.set_interval(10, self.update_data)
 
     def action_restart_service(self) -> None:
         self._manage_service("restart")

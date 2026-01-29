@@ -80,12 +80,14 @@ class UTMDashboard(App):
     BINDINGS = [
         # System bindings (Left)
         Binding("ctrl+q", "quit", "Quit"),
-        Binding("ctrl+r", "refresh", "Refresh All"),
-        Binding("ctrl+s", "export_snapshot", "Export Snapshot JSON"),
         # Update interval controls
         Binding("plus", "increase_interval", "+", show=False),
         Binding("equals", "increase_interval", "+", show=False),  # For keyboards without numpad
         Binding("minus", "decrease_interval", "-", show=False),
+        # Global UI Toggles
+        Binding("ctrl+s", "toggle_system_info", "Toggle System Info", show=False),
+        Binding("ctrl+r", "refresh", "Refresh All"),
+        Binding("ctrl+e", "export_snapshot", "Export Snapshot JSON"),
         # Navigation (Hidden)
         Binding("1", "switch_tab('processes')", "Processes", show=False),
         Binding("2", "switch_tab('services')", "Services", show=False),
@@ -175,6 +177,11 @@ class UTMDashboard(App):
         
         yield Footer()
 
+    def action_toggle_system_info(self) -> None:
+        """Toggle visibility of the System Information widget."""
+        system_info = self.query_one(CompactSystemInfo)
+        system_info.display = not system_info.display
+
     def action_refresh(self) -> None:
         for widget in self.query(Static):
             if hasattr(widget, 'update_data'):
@@ -243,12 +250,6 @@ class UTMDashboard(App):
         try:
             system_info = self.query_one(CompactSystemInfo)
             system_info.update_interval_display(new_interval)
+            system_info.update_timer_interval(new_interval)
         except Exception as e:
             logger.debug(f"Could not update system info interval display: {e}")
-
-        # Update DisksTab interval
-        try:
-            disks_tab = self.query_one(DisksTab)
-            disks_tab.set_update_interval(new_interval)
-        except Exception as e:
-            logger.debug(f"Could not update DisksTab interval: {e}")

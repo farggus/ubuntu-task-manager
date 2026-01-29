@@ -1,0 +1,18 @@
+2026-01-29 11:45:36 - INFO - [utm.main] - Starting Ubuntu Task Manager
+2026-01-29 11:45:42 - INFO - [utm.fail2ban_v2] - Synced active bans: 47 activated, 2 deactivated
+2026-01-29 11:45:47 - INFO - [utm.fail2ban_v2] - Fail2Ban v2 collection completed: 6511 bans, 6514 unbans, 41906 attempts, duration=10.23s
+2026-01-29 11:45:47 - INFO - [utm.fail2ban_plus] - Auto-parsed logs: {'success': True, 'bans_found': 6511, 'unbans_found': 6514, 'attempts_found': 41906, 'new_ips': 0, 'parse_time': 10.233344793319702, 'logs_parsed': ['/var/log/fail2ban.log.1', '/var/log/fail2ban.log.2.gz', '/var/log/fail2ban.log.3.gz', '/var/log/fail2ban.log.4.gz', '/var/log/fail2ban.log'], 'synced_active': 49}
+2026-01-29 11:45:54 - WARNING - [utm.fail2ban_collector] - Slow jail processing: 'recidive' took 17.48s
+2026-01-29 11:46:00 - WARNING - [utm.fail2ban_collector] - Slow jail processing: 'sshd' took 5.84s
+2026-01-29 11:46:18 - WARNING - [utm.fail2ban_collector] - Slow unban history parsing took 16.95s
+2026-01-29 11:46:18 - INFO - [utm.fail2ban_collector] - Fail2Ban collection completed: 182 banned IPs, 8 jails, duration=42.02s
+2026-01-29 11:46:18 - WARNING - [utm.fail2ban_tab] - Slow collector update took 42.02s
+2026-01-29 11:59:37 - INFO - [utm.fail2ban_tab] - Action Analyze Logs triggered
+2026-01-29 11:59:49 - WARNING - [utm.fail2ban_collector] - Slow jail processing: 'recidive' took 10.48s
+2026-01-29 11:59:55 - WARNING - [utm.fail2ban_collector] - Slow jail processing: 'sshd' took 6.25s
+2026-01-29 12:00:16 - WARNING - [utm.fail2ban_collector] - Slow unban history parsing took 20.13s
+2026-01-29 12:00:20 - INFO - [utm.fail2ban_collector] - Fail2Ban collection completed: 183 banned IPs, 8 jails, duration=41.91s
+2026-01-29 12:00:20 - WARNING - [utm.fail2ban_tab] - Slow collector update took 41.91s
+2026-01-29 12:00:57 - WARNING - [utm.fail2ban_collector] - Slow jail processing: 'sshd' took 8.87s
+2026-01-29 12:00:58 - INFO - [utm.fail2ban_collector] - Fail2Ban collection completed: 183 banned IPs, 8 jails, duration=10.91s
+2026-01-29 12:00:58 - WARNING - [utm.fail2ban_tab] - Slow collector update took 10.91s

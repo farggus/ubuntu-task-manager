@@ -97,7 +97,6 @@ class DisksTab(Vertical):
         super().__init__()
         self.collector = collector
         self._hierarchy = []  # Store for SMART lookup
-        self._update_timer = None  # Reference to update timer
 
     def compose(self):
         with Static(id="disks_header_container"):
@@ -124,18 +123,6 @@ class DisksTab(Vertical):
             "UUID",
         )
         self.update_data()
-        self._start_update_timer()
-
-    def _start_update_timer(self) -> None:
-        """Start or restart the update timer with current interval."""
-        if self._update_timer:
-            self._update_timer.stop()
-        interval_ms = getattr(self.app, 'update_interval', 2000)
-        self._update_timer = self.set_interval(interval_ms / 1000, self.update_data)
-
-    def set_update_interval(self, interval_ms: int) -> None:
-        """Update the refresh interval."""
-        self._start_update_timer()
 
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:
