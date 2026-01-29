@@ -95,6 +95,8 @@ class UTMDashboard(App):
         Binding("7", "switch_tab('users')", "Users", show=False),
         Binding("8", "switch_tab('disks')", "Disks", show=False),
         Binding("0", "switch_tab('logging')", "Logging", show=False),
+        # Toggle System Info
+        Binding("i", "toggle_system_info", "Toggle Info"),
     ]
 
     # Interval steps in ms
@@ -206,6 +208,14 @@ class UTMDashboard(App):
         except Exception as e:
             logger.error(f"Failed to export snapshot: {e}")
             self.notify(f"Export failed: {e}", severity="error")
+
+    def action_toggle_system_info(self) -> None:
+        """Toggle the visibility of the system information widget."""
+        try:
+            system_info = self.query_one(CompactSystemInfo)
+            system_info.display = not system_info.display
+        except Exception as e:
+            logger.debug(f"Could not toggle system info: {e}")
 
     def action_switch_tab(self, tab_id: str) -> None:
         tabs = self.query_one(TabbedContent)
