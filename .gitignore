@@ -46,3 +46,11 @@ custom_scripts/
 logs/*
 !logs/.gitkeep
 /.gemini
+
+# Sensitive data
+.env
+.env.*
+cache/
+data/
+*.db
+secrets/
