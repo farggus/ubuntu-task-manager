@@ -548,23 +548,34 @@ class Fail2banCollector(BaseCollector):
             return '-'
 
         try:
-            # Use grep to find the IP in the logs (tail -1000 is not enough for older bans)
-            # Use -a to treat binary as text
-            cmd = f"{GREP} -a '{ip}' {log_path} | {TAIL} -n 5"
-            
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=10
+            # Use grep to find the IP in the logs, pipe to tail
+            # Avoid shell=True by using Popen with pipe
+            grep_proc = subprocess.Popen(
+                [GREP, '-a', ip, log_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
             )
+            tail_proc = subprocess.Popen(
+                [TAIL, '-n', '5'],
+                stdin=grep_proc.stdout,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+            grep_proc.stdout.close()
 
-            if result.returncode != 0:
+            try:
+                output, _ = tail_proc.communicate(timeout=10)
+            except subprocess.TimeoutExpired:
+                tail_proc.kill()
+                grep_proc.kill()
+                return '-'
+
+            if not output:
                 return '-'
 
             targets = []
-            for line in result.stdout.splitlines():
+            for line in output.splitlines():
                 if not line.startswith('{'):
                     continue
                 try:
