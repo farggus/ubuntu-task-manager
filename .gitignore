@@ -58,3 +58,10 @@ secrets/
 /.gemini
 CLAUDE.md
 GEMINI.md
+
+# Local dev files
+AUDIT_FINAL.md
+ISSUES.md
+analyze_db.py
+audit_1.md
+audit_2.md
