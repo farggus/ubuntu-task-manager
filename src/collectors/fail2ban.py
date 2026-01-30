@@ -548,11 +548,16 @@ class Fail2banCollector(BaseCollector):
             return '-'
 
         try:
+            # Use grep to find the IP in the logs (tail -1000 is not enough for older bans)
+            # Use -a to treat binary as text
+            cmd = f"{GREP} -a '{ip}' {log_path} | {TAIL} -n 5"
+            
             result = subprocess.run(
-                [TAIL, '-1000', log_path],
+                cmd,
+                shell=True,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=10
             )
 
             if result.returncode != 0:

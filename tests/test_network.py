@@ -112,3 +112,244 @@ class TestIPValidation:
         ]
         for malicious in malicious_inputs:
             assert is_valid_ip(malicious) is False, f"Should reject: {malicious}"
+
+
+class TestNetworkCollectorFirewall:
+    """Tests for firewall-related methods."""
+
+    def test_check_ufw_not_found(self):
+        """Test UFW check when binary not found."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.side_effect = FileNotFoundError()
+            result = collector._check_ufw()
+            assert result == {}
+
+    def test_check_ufw_timeout(self):
+        """Test UFW check timeout handling."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired('cmd', 5)
+            result = collector._check_ufw()
+            assert result == {}
+
+    def test_check_ufw_active(self):
+        """Test UFW active status parsing."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="Status: active\n\nTo                         Action      From\n22/tcp                     ALLOW       Anywhere"
+            )
+            result = collector._check_ufw()
+            assert result['type'] == 'ufw'
+            assert result['status'] == 'active'
+
+    def test_check_ufw_inactive(self):
+        """Test UFW inactive status."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="Status: inactive"
+            )
+            result = collector._check_ufw()
+            assert result['status'] == 'inactive'
+
+    def test_check_firewalld_running(self):
+        """Test firewalld running status."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="running"
+            )
+            result = collector._check_firewalld()
+            assert result['type'] == 'firewalld'
+            assert result['status'] == 'running'
+
+    def test_check_firewalld_not_found(self):
+        """Test firewalld not found."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.side_effect = FileNotFoundError()
+            result = collector._check_firewalld()
+            assert result == {}
+
+    def test_check_iptables_configured(self):
+        """Test iptables configured status."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="Chain INPUT (policy ACCEPT)\nChain FORWARD (policy ACCEPT)"
+            )
+            result = collector._check_iptables()
+            assert result['type'] == 'iptables'
+            assert result['status'] == 'configured'
+
+    def test_check_iptables_not_found(self):
+        """Test iptables not found."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.side_effect = FileNotFoundError()
+            result = collector._check_iptables()
+            assert result == {}
+
+
+class TestNetworkCollectorConnections:
+    """Tests for connection-related methods."""
+
+    def test_get_connections_permission_denied(self):
+        """Test connections when permission denied."""
+        from collectors.network import NetworkCollector
+        import psutil
+        collector = NetworkCollector()
+        with patch('collectors.network.psutil.net_connections') as mock_conn:
+            mock_conn.side_effect = psutil.AccessDenied()
+            result = collector._get_connections()
+            assert 'error' in result
+
+    def test_get_open_ports_permission_denied(self):
+        """Test open ports when permission denied."""
+        from collectors.network import NetworkCollector
+        import psutil
+        collector = NetworkCollector()
+        with patch('collectors.network.psutil.net_connections') as mock_conn:
+            mock_conn.side_effect = psutil.AccessDenied()
+            result = collector._get_open_ports()
+            assert isinstance(result, list)
+            assert 'error' in result[0]
+
+
+class TestNetworkCollectorIptablesDetailed:
+    """Tests for detailed iptables parsing."""
+
+    def test_get_iptables_detailed_parses_rules(self):
+        """Test detailed iptables parsing."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="""Chain INPUT (policy DROP 123 packets, 456 bytes)
+num   pkts bytes target     prot opt in     out     source               destination
+1      100   5000 ACCEPT     all  --  lo     *       0.0.0.0/0            0.0.0.0/0
+2       50   2500 DROP       tcp  --  *      *       10.0.0.0/8           0.0.0.0/0            tcp dpt:22
+"""
+            )
+            result = collector._get_iptables_detailed()
+            assert len(result) == 2
+            assert result[0]['chain'] == 'INPUT'
+            assert result[0]['target'] == 'ACCEPT'
+            assert result[1]['target'] == 'DROP'
+
+    def test_get_iptables_detailed_failure(self):
+        """Test iptables detailed when command fails."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=1)
+            result = collector._get_iptables_detailed()
+            assert result == []
+
+    def test_get_iptables_detailed_exception(self):
+        """Test iptables detailed exception handling."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.side_effect = Exception("Test error")
+            result = collector._get_iptables_detailed()
+            assert result == []
+
+
+class TestNetworkCollectorNftables:
+    """Tests for nftables methods."""
+
+    def test_get_nftables_success(self):
+        """Test nftables JSON parsing."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout='{"nftables": [{"table": {"family": "inet", "name": "filter"}}]}'
+            )
+            result = collector._get_nftables_rules()
+            assert 'nftables' in result
+
+    def test_get_nftables_command_failure(self):
+        """Test nftables command failure."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=1,
+                stderr='Permission denied'
+            )
+            result = collector._get_nftables_rules()
+            assert 'error' in result
+
+    def test_get_nftables_json_error(self):
+        """Test nftables invalid JSON handling."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout='invalid json{'
+            )
+            result = collector._get_nftables_rules()
+            assert 'error' in result
+
+    def test_get_nftables_exception(self):
+        """Test nftables exception handling."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.side_effect = Exception("Test error")
+            result = collector._get_nftables_rules()
+            assert 'error' in result
+
+
+class TestNetworkCollectorRouting:
+    """Tests for routing table methods."""
+
+    def test_get_routing_table_success(self):
+        """Test routing table parsing."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout='default via 192.168.1.1 dev eth0\n192.168.1.0/24 dev eth0 proto kernel'
+            )
+            result = collector._get_routing_table()
+            assert len(result) == 2
+            assert 'route' in result[0]
+
+    def test_get_routing_table_timeout(self):
+        """Test routing table timeout."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired('cmd', 5)
+            result = collector._get_routing_table()
+            assert 'error' in result[0]
+
+    def test_get_routing_table_not_found(self):
+        """Test routing when ip command not found."""
+        from collectors.network import NetworkCollector
+        collector = NetworkCollector()
+        with patch('collectors.network.subprocess.run') as mock_run:
+            mock_run.side_effect = FileNotFoundError()
+            result = collector._get_routing_table()
+            assert 'error' in result[0]

@@ -201,7 +201,7 @@ class Fail2banTab(Vertical):
 
         if self._current_tab == SubTab.ACTIVE:
             table.add_columns(
-                "Jail", "Status", "Banned IP", "Country", "Org",
+                "Jail", "Status", "Service", "Banned IP", "Country", "Org",
                 "Attempts", "Ban For", "Banned", "Fail"
             )
         elif self._current_tab == SubTab.HISTORY:
@@ -448,8 +448,8 @@ class Fail2banTab(Vertical):
             row = table.get_row(curr_row_key)
 
             if self._current_tab == SubTab.ACTIVE:
-                # Column 2 is "Banned IP", column 0 is jail
-                ip = str(row[2]).strip()
+                # Column 3 is "Banned IP", column 0 is jail
+                ip = str(row[3]).strip()
                 jail = str(row[0]).strip()
 
                 # If jail is empty, look up in previous rows
@@ -586,7 +586,7 @@ class Fail2banTab(Vertical):
         jails = [j for j in f2b.get('jails', []) if j.get('name') not in VIRTUAL_JAILS]
 
         if not jails:
-            t.add_row("No jails configured", *[""] * 8)
+            t.add_row("No jails configured", *[""] * 9)
             return
 
         # Sort: OK jails first, ACTIVE jails next, recidive always last
@@ -623,7 +623,7 @@ class Fail2banTab(Vertical):
             jails = filtered_jails
 
         if not jails:
-            t.add_row(f"No matches for '{self._search_term}'", *[""] * 8)
+            t.add_row(f"No matches for '{self._search_term}'", *[""] * 9)
             return
 
         prev_had_bans = None
@@ -772,7 +772,7 @@ class Fail2banTab(Vertical):
 
         # Add separator if needed
         if add_separator:
-            t.add_row(*[""] * 9)
+            t.add_row(*[""] * 10)
 
         status_text = format_jail_status(currently_banned)
         banned_text = format_banned_count(currently_banned)
@@ -781,7 +781,7 @@ class Fail2banTab(Vertical):
             t.add_row(
                 Text(name, style="bold"),
                 status_text,
-                "-", "-", "-", "-", "-",
+                "-", "-", "-", "-", "-", "-",
                 banned_text,
                 str(filter_failures)
             )
@@ -791,6 +791,7 @@ class Fail2banTab(Vertical):
             t.add_row(
                 Text(name, style="bold"),
                 status_text,
+                Text(first_ip.get('target', '-'), style="blue"),
                 Text(first_ip.get('ip', '?'), style="red"),
                 first_ip.get('country', 'Unknown'),
                 format_org(first_ip.get('org', '-')),
@@ -805,6 +806,7 @@ class Fail2banTab(Vertical):
                 t.add_row(
                     "",
                     "",
+                    Text(ip_info.get('target', '-'), style="blue"),
                     Text(ip_info.get('ip', '?'), style="red"),
                     ip_info.get('country', 'Unknown'),
                     format_org(ip_info.get('org', '-')),

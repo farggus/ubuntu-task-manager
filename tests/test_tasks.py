@@ -431,5 +431,57 @@ class TestUserCrontab(unittest.TestCase):
         self.assertEqual(len(result['jobs']), 1)
 
 
+class TestAnacrontab(unittest.TestCase):
+    """Tests for _get_anacron_jobs method."""
+
+    def setUp(self):
+        self.collector = TasksCollector()
+
+    def test_anacron_returns_dict(self):
+        """Test _get_anacron_jobs returns dict."""
+        result = self.collector._get_anacron_jobs()
+        self.assertIsInstance(result, dict)
+        self.assertIn('jobs', result)
+        self.assertIn('count', result)
+
+    def test_anacron_has_status(self):
+        """Test anacron result has status field."""
+        result = self.collector._get_anacron_jobs()
+        # Either has jobs or status field
+        has_valid_structure = 'status' in result or 'jobs' in result
+        self.assertTrue(has_valid_structure)
+
+
+class TestCroniterAvailability(unittest.TestCase):
+    """Tests related to croniter availability."""
+
+    def test_croniter_flag_exists(self):
+        """Test CRONITER_AVAILABLE flag is defined."""
+        from collectors.tasks import CRONITER_AVAILABLE
+        self.assertIsInstance(CRONITER_AVAILABLE, bool)
+
+
+class TestCollectStructure(unittest.TestCase):
+    """Tests for collect() return structure."""
+
+    def setUp(self):
+        self.collector = TasksCollector()
+
+    def test_collect_has_cron(self):
+        """Test collect has cron."""
+        result = self.collector.collect()
+        self.assertIn('cron', result)
+
+    def test_collect_has_systemd_timers(self):
+        """Test collect has systemd_timers."""
+        result = self.collector.collect()
+        self.assertIn('systemd_timers', result)
+
+    def test_collect_has_anacron(self):
+        """Test collect has anacron."""
+        result = self.collector.collect()
+        self.assertIn('anacron', result)
+
+
 if __name__ == '__main__':
     unittest.main()

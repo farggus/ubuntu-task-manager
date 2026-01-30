@@ -138,3 +138,155 @@ class TestProcessesEdgeCases:
         assert isinstance(data2, dict)
         assert 'processes' in data1
         assert 'processes' in data2
+
+
+class TestProcessStateCounting:
+    """Tests for process state counting logic."""
+
+    def test_zombie_count(self):
+        """Test zombie process counting."""
+        import psutil
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+
+        # Create mock process data with zombie
+        mock_processes = [
+            {'status': psutil.STATUS_ZOMBIE, 'cpu': 0.0},
+            {'status': psutil.STATUS_SLEEPING, 'cpu': 0.0},
+            {'status': psutil.STATUS_RUNNING, 'cpu': 5.0},
+        ]
+
+        with patch.object(collector, '_get_processes', return_value=mock_processes):
+            data = collector.collect()
+            assert data['stats']['zombies'] == 1
+
+    def test_running_with_cpu_activity(self):
+        """Test that sleeping process with CPU activity counts as running."""
+        import psutil
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+
+        mock_processes = [
+            {'status': psutil.STATUS_SLEEPING, 'cpu': 5.0},  # Should count as running
+            {'status': psutil.STATUS_SLEEPING, 'cpu': 0.0},  # Should count as sleeping
+        ]
+
+        with patch.object(collector, '_get_processes', return_value=mock_processes):
+            data = collector.collect()
+            assert data['stats']['running'] == 1
+            assert data['stats']['sleeping'] == 1
+
+    def test_other_status_counting(self):
+        """Test 'other' status counting."""
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+
+        mock_processes = [
+            {'status': 'stopped', 'cpu': 0.0},
+            {'status': 'disk-sleep', 'cpu': 0.0},
+        ]
+
+        with patch.object(collector, '_get_processes', return_value=mock_processes):
+            data = collector.collect()
+            assert data['stats']['other'] == 2
+
+
+class TestGetSummary:
+    """Tests for _get_summary method."""
+
+    def test_get_summary_returns_dict(self):
+        """Test _get_summary returns proper structure."""
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+        summary = collector._get_summary()
+        assert isinstance(summary, dict)
+        assert 'total' in summary
+        assert 'running' in summary
+        assert 'sleeping' in summary
+
+    def test_get_summary_non_negative(self):
+        """Test _get_summary returns non-negative counts."""
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+        summary = collector._get_summary()
+        for key, value in summary.items():
+            assert value >= 0, f"{key} should be non-negative"
+
+    @patch('collectors.processes.psutil.process_iter')
+    def test_get_summary_handles_exceptions(self, mock_iter):
+        """Test _get_summary handles process exceptions."""
+        import psutil
+        mock_iter.side_effect = psutil.NoSuchProcess(pid=1)
+
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+        # Should not raise
+        summary = collector._get_summary()
+        assert isinstance(summary, dict)
+
+
+class TestProcessParentInfo:
+    """Tests for parent process info retrieval."""
+
+    @patch('collectors.processes.psutil.Process')
+    @patch('collectors.processes.psutil.process_iter')
+    def test_parent_not_found(self, mock_iter, mock_process):
+        """Test handling when parent process not found."""
+        import psutil
+        from datetime import datetime
+
+        # Mock process data
+        mock_info = {
+            'pid': 123,
+            'name': 'test',
+            'username': 'user',
+            'status': psutil.STATUS_RUNNING,
+            'cpu_percent': 1.0,
+            'memory_percent': 0.5,
+            'memory_info': MagicMock(rss=1024*1024),
+            'create_time': datetime.now().timestamp(),
+            'cmdline': ['test', 'cmd'],
+            'ppid': 1
+        }
+
+        mock_proc = MagicMock()
+        mock_proc.info = mock_info
+        mock_iter.return_value = [mock_proc]
+
+        mock_process.side_effect = psutil.NoSuchProcess(pid=1)
+
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+        processes = collector._get_processes()
+
+        assert len(processes) == 1
+        assert processes[0]['parent_name'] == '?'
+
+    @patch('collectors.processes.psutil.process_iter')
+    def test_handles_zombie_process_exception(self, mock_iter):
+        """Test handling of ZombieProcess exception during iteration."""
+        import psutil
+
+        mock_proc = MagicMock()
+        mock_proc.info = MagicMock()
+        # Accessing info raises ZombieProcess
+        type(mock_proc).info = property(lambda self: (_ for _ in ()).throw(psutil.ZombieProcess(1)))
+
+        mock_iter.return_value = [mock_proc]
+
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+        processes = collector._get_processes()
+        # Should skip the zombie process
+        assert processes == []
+
+    @patch('collectors.processes.psutil.process_iter')
+    def test_handles_general_exception(self, mock_iter):
+        """Test handling of general exception."""
+        mock_iter.side_effect = Exception("Unexpected error")
+
+        from collectors.processes import ProcessesCollector
+        collector = ProcessesCollector()
+        processes = collector._get_processes()
+        assert processes == []
+        assert len(collector.errors) > 0

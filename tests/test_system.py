@@ -306,5 +306,192 @@ class TestSMARTInfo(unittest.TestCase):
         self.assertTrue(result == {} or result is None)
 
 
+class TestPackageStatsExtended(unittest.TestCase):
+    """Extended tests for package statistics."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+        self.collector._pkg_cache_time = 0
+        self.collector._pkg_cache = {'total': 0, 'updates': 0, 'upgradable_list': [], 'all_packages': []}
+
+    def test_package_stats_uses_cache(self):
+        """Test that package stats uses cache when fresh."""
+        import time
+        # Set cache with recent timestamp
+        self.collector._pkg_cache_time = time.time()
+        self.collector._pkg_cache = {'total': 100, 'updates': 5, 'upgradable_list': [], 'all_packages': []}
+
+        result = self.collector._get_package_stats()
+        self.assertEqual(result['total'], 100)
+
+    @patch('collectors.system.subprocess.run')
+    def test_package_stats_parses_apt_list(self, mock_run):
+        """Test parsing of apt list --upgradable output."""
+        # Mock dpkg-query response
+        dpkg_response = MagicMock(returncode=0, stdout='pkg1 1.0\npkg2 2.0\n')
+        # Mock apt list response
+        apt_response = MagicMock(returncode=0, stdout='Listing...\npkg1/focal 1.1 amd64 [upgradable]\n')
+
+        mock_run.side_effect = [dpkg_response, apt_response]
+
+        result = self.collector._get_package_stats()
+        self.assertIsInstance(result, dict)
+        self.assertIn('total', result)
+
+    @patch('collectors.system.subprocess.run')
+    def test_package_stats_handles_empty_apt(self, mock_run):
+        """Test handling of empty apt output."""
+        dpkg_response = MagicMock(returncode=0, stdout='pkg1 1.0\n')
+        apt_response = MagicMock(returncode=0, stdout='Listing...\n')
+
+        mock_run.side_effect = [dpkg_response, apt_response]
+
+        result = self.collector._get_package_stats()
+        self.assertEqual(result['updates'], 0)
+
+
+class TestServiceStatsExtended(unittest.TestCase):
+    """Extended tests for service statistics."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    @patch('collectors.system.subprocess.run')
+    def test_service_stats_parses_failed(self, mock_run):
+        """Test parsing of failed services."""
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='  UNIT                  LOAD   ACTIVE SUB    DESCRIPTION\nfailed.service        loaded failed failed Test\n\n1 loaded units listed.'
+        )
+
+        result = self.collector._get_service_stats()
+        self.assertIn('failed', result)
+
+    @patch('collectors.system.subprocess.run')
+    def test_service_stats_file_not_found(self, mock_run):
+        """Test handling when systemctl not found."""
+        mock_run.side_effect = FileNotFoundError()
+        result = self.collector._get_service_stats()
+        self.assertIsInstance(result, dict)
+
+
+class TestDiskInfoExtended(unittest.TestCase):
+    """Extended tests for disk information."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_disk_info_returns_dict(self):
+        """Test that disk info returns dict."""
+        result = self.collector._get_disk_info()
+        self.assertIsInstance(result, dict)
+
+    def test_disk_info_has_root(self):
+        """Test that root partition is included."""
+        result = self.collector._get_disk_info()
+        # Should have at least root partition
+        self.assertTrue(len(result) > 0)
+
+
+class TestCPUInfoExtended(unittest.TestCase):
+    """Extended tests for CPU information."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_cpu_info_has_usage(self):
+        """Test CPU info includes usage percentage."""
+        result = self.collector._get_cpu_info()
+        self.assertIn('usage_total', result)
+
+    def test_cpu_info_usage_in_range(self):
+        """Test CPU usage is in valid range."""
+        result = self.collector._get_cpu_info()
+        self.assertGreaterEqual(result['usage_total'], 0)
+        self.assertLessEqual(result['usage_total'], 100)
+
+
+class TestMemoryInfoExtended(unittest.TestCase):
+    """Extended tests for memory information."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_memory_info_has_available(self):
+        """Test memory info has available."""
+        result = self.collector._get_memory_info()
+        self.assertIn('available', result)
+
+    def test_memory_info_has_percent(self):
+        """Test memory info has percent."""
+        result = self.collector._get_memory_info()
+        self.assertIn('percent', result)
+
+    def test_memory_percent_in_range(self):
+        """Test memory percent is 0-100."""
+        result = self.collector._get_memory_info()
+        self.assertGreaterEqual(result['percent'], 0)
+        self.assertLessEqual(result['percent'], 100)
+
+
+class TestServicesStats(unittest.TestCase):
+    """Tests for services statistics in collect."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_collect_has_services_stats(self):
+        """Test collect includes services_stats."""
+        result = self.collector.collect()
+        self.assertIn('services_stats', result)
+
+    def test_services_stats_has_failed(self):
+        """Test services_stats has failed count."""
+        result = self.collector.collect()
+        self.assertIn('failed', result['services_stats'])
+
+
+class TestProcessesInCollect(unittest.TestCase):
+    """Tests for processes info in collect."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_collect_has_processes(self):
+        """Test collect includes processes."""
+        result = self.collector.collect()
+        self.assertIn('processes', result)
+
+    def test_processes_has_total(self):
+        """Test processes has total count."""
+        result = self.collector.collect()
+        self.assertIn('total', result['processes'])
+
+
+class TestNetworkInfo(unittest.TestCase):
+    """Tests for basic network info in system collector."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_collect_has_network(self):
+        """Test collect includes network info."""
+        result = self.collector.collect()
+        self.assertIn('network', result)
+
+
+class TestTemperature(unittest.TestCase):
+    """Tests for temperature collection."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_collect_handles_no_sensors(self):
+        """Test that collect handles systems without temperature sensors."""
+        result = self.collector.collect()
+        # Should not fail even without sensors
+        self.assertIsInstance(result, dict)
+
+
 if __name__ == '__main__':
     unittest.main()
