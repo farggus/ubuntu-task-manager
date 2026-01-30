@@ -17,6 +17,18 @@ from utils.ui_helpers import update_table_preserving_scroll
 
 logger = get_logger("processes_tab")
 
+# Column key to process data field mapping
+COLUMN_SORT_KEYS = {
+    "PID": ("pid", int),
+    "Name": ("name", str),
+    "User": ("user", str),
+    "Status": ("status", str),
+    "CPU%": ("cpu", float),
+    "Mem%": ("mem_pct", float),
+    "Parent": ("ppid", int),
+    "Command": ("command", str),
+}
+
 
 class ProcessesTab(Vertical):
     """Tab displaying running processes with filtering."""
@@ -57,6 +69,9 @@ class ProcessesTab(Vertical):
         super().__init__()
         self.collector = collector
         self.view_mode = 'all'  # 'all' or 'zombies'
+        self.sort_column = "CPU%"  # Default sort column
+        self.sort_reverse = True  # Default descending (highest CPU first)
+        self._last_data: Dict[str, Any] = {}  # Cache for re-sorting
 
     def compose(self):
         # Header
@@ -71,6 +86,25 @@ class ProcessesTab(Vertical):
         table = self.query_one(DataTable)
         table.add_columns("PID", "Name", "User", "Status", "CPU%", "Mem%", "Parent", "Command")
         self.update_data()
+
+    def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
+        """Handle click on column header to sort by that column."""
+        column_label = str(event.label)
+        if column_label in COLUMN_SORT_KEYS:
+            if self.sort_column == column_label:
+                # Toggle sort direction if clicking same column
+                self.sort_reverse = not self.sort_reverse
+            else:
+                # New column: set default direction
+                self.sort_column = column_label
+                # Numeric columns default to descending, text to ascending
+                self.sort_reverse = column_label in ("CPU%", "Mem%", "PID", "Parent")
+
+            direction = "↓" if self.sort_reverse else "↑"
+            self.notify(f"Sorted by {column_label} {direction}")
+            # Re-render with cached data using new sort order
+            if self._last_data:
+                self.update_table(self._last_data)
 
     def action_view_all(self) -> None:
         """Switch to 'all' processes view."""
@@ -123,10 +157,11 @@ class ProcessesTab(Vertical):
 
     def update_table(self, data: Dict[str, Any]) -> None:
         """Update table and header on main thread."""
+        self._last_data = data  # Cache for re-sorting
         table = self.query_one(DataTable)
-        
+
         processes = data.get('processes', [])
-        
+
         def populate(t):
             # Filter based on view mode
             if self.view_mode == 'zombies':
@@ -134,7 +169,19 @@ class ProcessesTab(Vertical):
             else:
                 filtered_list = processes
 
-            for p in filtered_list[:1000]: # Limit to 1000 rows for performance
+            # Apply sorting
+            if self.sort_column in COLUMN_SORT_KEYS:
+                field, type_fn = COLUMN_SORT_KEYS[self.sort_column]
+                try:
+                    filtered_list = sorted(
+                        filtered_list,
+                        key=lambda x: type_fn(x.get(field, 0) or 0),
+                        reverse=self.sort_reverse
+                    )
+                except (ValueError, TypeError):
+                    pass  # Fall back to original order if sorting fails
+
+            for p in filtered_list[:1000]:  # Limit to 1000 rows for performance
                 pid = str(p.get('pid', ''))
                 name = p.get('name', '')
                 user = p.get('user', '')

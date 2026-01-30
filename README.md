@@ -4,7 +4,7 @@ Full-featured TUI dashboard for monitoring and managing Ubuntu/Linux servers dir
 
 ## Features
 
-### 9 Monitoring Tabs
+### 11 Monitoring Tabs
 
 | Key | Tab | Description |
 |-----|-----|-------------|
@@ -14,8 +14,10 @@ Full-featured TUI dashboard for monitoring and managing Ubuntu/Linux servers dir
 | `4` | **Containers** | Docker containers with management and log viewing |
 | `5` | **Tasks** | Cron jobs and Systemd timers |
 | `6` | **Network** | Interfaces, ports, firewall, routes |
+| `F` | **Fail2ban** | Active bans, jail status, IP management |
+| `Shift+F` | **Fail2ban+** | Attack history, slow brute-force detection, analytics |
 | `7` | **Users** | Active sessions and all system users |
-| `8` | **Disks** | Disk partitions with hierarchy |
+| `8` | **Disks** | Disk partitions with hierarchy, SMART status |
 | `0` | **Logging** | Live application log tail |
 
 ### Compact System Panel (Always Visible)
@@ -31,6 +33,7 @@ Displayed in 3 columns with live data:
 **Processes Tab:**
 - `A` - All processes, `Z` - Zombies only
 - `C` - Send SIGCHLD to parent, `K` - SIGTERM (kill zombie)
+- Click on column header to sort (click again to toggle asc/desc)
 
 **Services Tab:**
 - `R` - Restart, `S` - Start, `K` - Stop service
@@ -44,10 +47,22 @@ Displayed in 3 columns with live data:
 - `X` - Start, `K` - Stop, `Shift+R` - Restart
 - `L` - Show container logs
 
+**Fail2ban Tab:**
+- `A` - Analyze fail2ban logs
+- `Ctrl+U` - Unban selected IP
+- `Ctrl+W` - Manage whitelist
+- `Ctrl+B` - Ban IP manually
+- `Ctrl+M` - Migrate bans to 3Y
+
+**Fail2ban+ Tab:**
+- `D` - Database manager
+- `R` - Refresh data
+
 **Global:**
 - `Ctrl+Q` - Quit
 - `Ctrl+R` - Refresh all data
-- `Ctrl+S` - Export snapshot to JSON
+- `Ctrl+S` - Toggle system info panel
+- `Ctrl+E` - Export snapshot to JSON
 
 ## Installation
 
@@ -164,7 +179,8 @@ utm/
 │   │   ├── network.py          # Interfaces, Ports, Firewall
 │   │   ├── tasks.py            # Cron jobs & Systemd timers
 │   │   ├── processes.py        # Process management
-│   │   └── users.py            # Active sessions
+│   │   ├── users.py            # Active sessions
+│   │   └── fail2ban.py         # Fail2ban bans & jails
 │   ├── dashboard/              # UI Modules (View/Controller)
 │   │   ├── app.py              # Main Textual App class
 │   │   ├── style.tcss          # Stylesheet
@@ -205,10 +221,12 @@ src/main.py
        │    ├── network.py (psutil)
        │    ├── tasks.py (croniter, dateutil)
        │    ├── processes.py (psutil)
-       │    └── users.py (psutil)
+       │    ├── users.py (psutil)
+       │    └── fail2ban.py (fail2ban-client)
        └── src/dashboard/widgets/ (UI Components)
             ├── system_info.py
             ├── services.py
+            ├── fail2ban.py, fail2ban_plus.py
             └── ...
 ```
 
@@ -272,10 +290,11 @@ custom_checks:
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.10+
 - Linux system (tested on Ubuntu/Debian)
 - Systemd (for service monitoring)
 - Docker (optional, for container monitoring)
+- Fail2ban (optional, for intrusion detection monitoring)
 
 ## Dependencies
 

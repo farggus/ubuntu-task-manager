@@ -15,6 +15,14 @@ logger = get_logger("processes_collector")
 class ProcessesCollector(BaseCollector):
     """Collects detailed information about running processes."""
 
+    def __init__(self, config=None):
+        super().__init__(config)
+        # Warm up CPU counters - first call always returns 0.0
+        try:
+            list(psutil.process_iter(['cpu_percent']))
+        except Exception:
+            pass  # Ignore errors during warmup
+
     def collect(self) -> Dict[str, Any]:
         """Collect processes information and statistics."""
         processes = self._get_processes()
@@ -51,33 +59,36 @@ class ProcessesCollector(BaseCollector):
         try:
             # Fetch all useful attributes at once
             attrs = [
-                'pid', 'name', 'username', 'status', 
+                'pid', 'name', 'username', 'status',
                 'cpu_percent', 'memory_percent', 'memory_info',
                 'create_time', 'cmdline', 'ppid'
             ]
-            
+
+            # Build PID->name map once (O(n) instead of O(n^2) for parent lookups)
+            pid_to_name = {}
+            proc_infos = []
             for p in psutil.process_iter(attrs):
                 try:
                     p_info = p.info
-                    
+                    pid_to_name[p_info['pid']] = p_info['name']
+                    proc_infos.append(p_info)
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+
+            for p_info in proc_infos:
+                try:
                     # Format time
                     create_time = datetime.datetime.fromtimestamp(p_info['create_time'])
                     time_str = create_time.strftime("%H:%M:%S")
-                    
+
                     # Format command
                     cmd = " ".join(p_info['cmdline']) if p_info['cmdline'] else p_info['name']
-                    
+
                     # Memory in MB
                     mem_mb = (p_info['memory_info'].rss / 1024 / 1024) if p_info['memory_info'] else 0
-                    
-                    # Try to get parent name (might be expensive for all, but useful)
-                    parent_name = '?'
-                    if p_info['ppid']:
-                        try:
-                            parent = psutil.Process(p_info['ppid'])
-                            parent_name = parent.name()
-                        except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            pass
+
+                    # Get parent name from pre-built map (O(1) lookup)
+                    parent_name = pid_to_name.get(p_info['ppid'], '?')
 
                     processes.append({
                         'pid': p_info['pid'],
@@ -92,12 +103,12 @@ class ProcessesCollector(BaseCollector):
                         'ppid': p_info['ppid'],
                         'parent_name': parent_name
                     })
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, TypeError):
                     continue
-                    
+
         except Exception as e:
             self.errors.append(f"Error listing processes: {e}")
-            
+
         # Sort by CPU usage descending by default
         return sorted(processes, key=lambda x: x['cpu'], reverse=True)
 
