@@ -75,9 +75,8 @@ class UsersTab(Vertical):
 
     def on_mount(self) -> None:
         """Setup table and start updates."""
+        self._setup_table_columns()
         self.update_data()
-
-    @work(exclusive=True, thread=True)
 
     def _setup_table_columns(self) -> None:
         """Setup table columns based on current view mode."""
