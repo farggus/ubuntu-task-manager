@@ -1,6 +1,6 @@
 [project]
 name = "ubuntu-task-manager"
-version = "2.0.0"
+version = "2.1.0"
 description = "TUI dashboard for monitoring and managing Ubuntu/Linux servers"
 readme = "README.md"
 license = {text = "MIT"}
