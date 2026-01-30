@@ -292,10 +292,20 @@ class SystemCollector(BaseCollector):
 
     def _get_disk_info(self) -> Dict[str, Any]:
         """Get disk information with full hierarchy like lsblk (disk → part → lvm)."""
-        hierarchy = []
+        mountpoints = self._get_mountpoints()
+        smart_cache = self._get_smart_cache()
+        hierarchy = self._parse_disk_hierarchy(mountpoints, smart_cache)
+        hierarchy.sort(key=lambda d: (0 if d['name'].startswith('nvme') else 1, d['name']))
 
-        # Get mountpoints and usage from psutil
-        mountpoints = {}  # device -> list of {mountpoint, fstype}
+        return {
+            'hierarchy': hierarchy,
+            'partitions': self._build_partitions_list(hierarchy),
+            'io': self._get_io_stats(),
+        }
+
+    def _get_mountpoints(self) -> Dict[str, list]:
+        """Get mountpoints and filesystem types from psutil."""
+        mountpoints = {}
         for partition in psutil.disk_partitions(all=False):
             if '/snap/' in partition.mountpoint or '/loop' in partition.device:
                 continue
@@ -306,187 +316,195 @@ class SystemCollector(BaseCollector):
                 'mountpoint': partition.mountpoint,
                 'fstype': partition.fstype,
             })
+        return mountpoints
 
-        def get_usage(mountpoint):
-            """Get disk usage for a mountpoint."""
-            try:
-                usage = psutil.disk_usage(mountpoint)
-                return {
-                    'total': usage.total,
-                    'used': usage.used,
-                    'free': usage.free,
-                    'percent': round(usage.percent, 1),
-                }
-            except (PermissionError, OSError, FileNotFoundError):
-                return None
+    def _get_disk_usage(self, mountpoint: str) -> Dict[str, Any] | None:
+        """Get disk usage for a mountpoint."""
+        try:
+            usage = psutil.disk_usage(mountpoint)
+            return {
+                'total': usage.total,
+                'used': usage.used,
+                'free': usage.free,
+                'percent': round(usage.percent, 1),
+            }
+        except (PermissionError, OSError, FileNotFoundError):
+            return None
 
-        # Get SMART cache
+    def _get_smart_cache(self) -> Dict[str, Any]:
+        """Get SMART cache, updating if stale (>5 min)."""
         smart_cache = getattr(self, '_smart_cache', {})
         smart_cache_time = getattr(self, '_smart_cache_time', 0)
 
-        # Parse lsblk with full hierarchy
+        if time.time() - smart_cache_time > 300:
+            disk_info_map = self._get_disk_list_for_smart()
+            smart_cache = self._get_smart_info(disk_info_map)
+            self._smart_cache = smart_cache
+            self._smart_cache_time = time.time()
+
+        return smart_cache
+
+    def _get_disk_list_for_smart(self) -> Dict[str, Any]:
+        """Get list of physical disks for SMART queries."""
         disk_info_map = {}
+        try:
+            result = subprocess.run(
+                [LSBLK, '-o', 'NAME,TYPE', '-J'],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                lsblk_data = json.loads(result.stdout)
+                for device in lsblk_data.get('blockdevices', []):
+                    if device.get('type') == 'disk':
+                        name = f"/dev/{device.get('name', '')}"
+                        disk_info_map[name] = {'type': 'disk'}
+        except (json.JSONDecodeError, FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        return disk_info_map
+
+    def _parse_disk_hierarchy(self, mountpoints: Dict, smart_cache: Dict) -> list:
+        """Parse lsblk output and build disk hierarchy."""
+        hierarchy = []
         try:
             result = subprocess.run(
                 [LSBLK, '-o', 'NAME,VENDOR,MODEL,SERIAL,ROTA,TYPE,SIZE,TRAN,UUID,FSTYPE', '-J', '-b'],
                 capture_output=True, text=True, timeout=5
             )
-            if result.returncode == 0:
-                lsblk_data = json.loads(result.stdout)
+            if result.returncode != 0:
+                return hierarchy
 
-                # Build disk_info_map for SMART lookup
-                for device in lsblk_data.get('blockdevices', []):
-                    if device.get('type') == 'disk':
-                        name = f"/dev/{device.get('name', '')}"
-                        disk_info_map[name] = {'type': 'disk'}
+            lsblk_data = json.loads(result.stdout)
+            for device in lsblk_data.get('blockdevices', []):
+                if device.get('type') != 'disk':
+                    continue
 
-                # Update SMART cache every 5 minutes
-                if time.time() - smart_cache_time > 300:
-                    smart_cache = self._get_smart_info(disk_info_map)
-                    self._smart_cache = smart_cache
-                    self._smart_cache_time = time.time()
+                disk_entry = self._build_disk_entry(device, smart_cache)
+                if disk_entry is None:
+                    continue
 
-                # Process each disk
-                for device in lsblk_data.get('blockdevices', []):
-                    if device.get('type') != 'disk':
-                        continue
+                for child in device.get('children', []):
+                    part_entry = self._build_partition_entry(child, mountpoints)
+                    for grandchild in child.get('children', []):
+                        lvm_entry = self._build_lvm_entry(grandchild, mountpoints)
+                        part_entry['children'].append(lvm_entry)
+                    disk_entry['children'].append(part_entry)
 
-                    dev_name = device.get('name', '')
-                    full_dev = f"/dev/{dev_name}"
-
-                    # Skip loop and optical devices
-                    if 'loop' in dev_name or dev_name.startswith('sr'):
-                        continue
-
-                    model = (device.get('model') or '').strip()
-                    vendor = (device.get('vendor') or '').strip()
-                    transport = (device.get('tran') or '').lower()
-                    is_usb = transport == 'usb'
-                    is_ssd = not device.get('rota', True) or self._is_ssd_model(model)
-                    smart = smart_cache.get(full_dev, {})
-
-                    disk_type = 'nvme' if 'nvme' in dev_name else ('ssd' if is_ssd else 'hdd')
-
-                    disk_entry = {
-                        'name': dev_name,  # Just 'sda', not '/dev/sda'
-                        'full_path': full_dev,
-                        'type': disk_type,
-                        'transport': transport,  # sata, usb, nvme, etc.
-                        'is_usb': is_usb,
-                        'model': model,
-                        'vendor': vendor,
-                        'serial': (device.get('serial') or '').strip(),
-                        'size': device.get('size', 0),
-                        'temperature': smart.get('temperature'),
-                        'smart_status': smart.get('status', 'N/A'),
-                        'children': [],
-                    }
-
-                    # Process partitions (children)
-                    for child in device.get('children', []):
-                        child_name = child.get('name', '')
-                        child_full = f"/dev/{child_name}"
-                        child_type = child.get('type', '')
-
-                        # Get mount info for this partition (may have multiple bind mounts)
-                        mount_list = mountpoints.get(child_full, [])
-                        all_mounts = [m['mountpoint'] for m in mount_list]
-                        primary_mount = all_mounts[0] if all_mounts else ''
-                        # Prefer fstype from mount, fallback to lsblk
-                        fstype = mount_list[0]['fstype'] if mount_list else (child.get('fstype') or '')
-                        usage = get_usage(primary_mount) if primary_mount else None
-
-                        part_entry = {
-                            'name': child_name,
-                            'full_path': child_full,
-                            'node_type': child_type,  # 'part', 'lvm', etc.
-                            'size': child.get('size', 0),
-                            'mountpoint': primary_mount,  # Primary for usage calc
-                            'mountpoints': all_mounts,    # All mountpoints for display
-                            'fstype': fstype,
-                            'uuid': child.get('uuid', ''),
-                            'usage': usage,
-                            'children': [],
-                        }
-
-                        # Process LVM volumes on partition (grandchildren)
-                        for grandchild in child.get('children', []):
-                            gc_name = grandchild.get('name', '')
-                            gc_full = f"/dev/mapper/{gc_name}"
-                            gc_type = grandchild.get('type', '')
-
-                            gc_mount_list = mountpoints.get(gc_full, [])
-                            gc_all_mounts = [m['mountpoint'] for m in gc_mount_list]
-                            gc_primary_mount = gc_all_mounts[0] if gc_all_mounts else ''
-                            # Prefer fstype from mount, fallback to lsblk
-                            gc_fstype = gc_mount_list[0]['fstype'] if gc_mount_list else (grandchild.get('fstype') or '')
-                            gc_usage = get_usage(gc_primary_mount) if gc_primary_mount else None
-
-                            lvm_entry = {
-                                'name': gc_name,
-                                'full_path': gc_full,
-                                'node_type': gc_type,
-                                'size': grandchild.get('size', 0),
-                                'mountpoint': gc_primary_mount,
-                                'mountpoints': gc_all_mounts,
-                                'fstype': gc_fstype,
-                                'uuid': grandchild.get('uuid', ''),
-                                'usage': gc_usage,
-                            }
-                            part_entry['children'].append(lvm_entry)
-
-                        disk_entry['children'].append(part_entry)
-
-                    # Calculate aggregated disk usage from all mounted children
-                    total_used = 0
-                    total_size = disk_entry['size']
-                    has_mounted = False
-
-                    for part in disk_entry['children']:
-                        if part.get('usage'):
-                            total_used += part['usage'].get('used', 0)
-                            has_mounted = True
-                        # Also check LVM children
-                        for lvm in part.get('children', []):
-                            if lvm.get('usage'):
-                                total_used += lvm['usage'].get('used', 0)
-                                has_mounted = True
-
-                    if has_mounted and total_size > 0:
-                        disk_entry['usage'] = {
-                            'total': total_size,
-                            'used': total_used,
-                            'free': total_size - total_used,
-                            'percent': round((total_used / total_size) * 100, 1),
-                        }
-
-                    hierarchy.append(disk_entry)
+                self._calculate_disk_usage(disk_entry)
+                hierarchy.append(disk_entry)
 
         except (json.JSONDecodeError, FileNotFoundError, subprocess.TimeoutExpired):
             pass
 
-        # Sort: nvme first, then sd* alphabetically
-        hierarchy.sort(key=lambda d: (0 if d['name'].startswith('nvme') else 1, d['name']))
+        return hierarchy
 
-        # I/O stats
+    def _build_disk_entry(self, device: Dict, smart_cache: Dict) -> Dict[str, Any] | None:
+        """Build disk entry from lsblk device data."""
+        dev_name = device.get('name', '')
+        if 'loop' in dev_name or dev_name.startswith('sr'):
+            return None
+
+        full_dev = f"/dev/{dev_name}"
+        model = (device.get('model') or '').strip()
+        transport = (device.get('tran') or '').lower()
+        is_ssd = not device.get('rota', True) or self._is_ssd_model(model)
+        smart = smart_cache.get(full_dev, {})
+
+        return {
+            'name': dev_name,
+            'full_path': full_dev,
+            'type': 'nvme' if 'nvme' in dev_name else ('ssd' if is_ssd else 'hdd'),
+            'transport': transport,
+            'is_usb': transport == 'usb',
+            'model': model,
+            'vendor': (device.get('vendor') or '').strip(),
+            'serial': (device.get('serial') or '').strip(),
+            'size': device.get('size', 0),
+            'temperature': smart.get('temperature'),
+            'smart_status': smart.get('status', 'N/A'),
+            'children': [],
+        }
+
+    def _build_partition_entry(self, child: Dict, mountpoints: Dict) -> Dict[str, Any]:
+        """Build partition entry from lsblk child data."""
+        child_name = child.get('name', '')
+        child_full = f"/dev/{child_name}"
+        mount_list = mountpoints.get(child_full, [])
+        all_mounts = [m['mountpoint'] for m in mount_list]
+        primary_mount = all_mounts[0] if all_mounts else ''
+        fstype = mount_list[0]['fstype'] if mount_list else (child.get('fstype') or '')
+
+        return {
+            'name': child_name,
+            'full_path': child_full,
+            'node_type': child.get('type', ''),
+            'size': child.get('size', 0),
+            'mountpoint': primary_mount,
+            'mountpoints': all_mounts,
+            'fstype': fstype,
+            'uuid': child.get('uuid', ''),
+            'usage': self._get_disk_usage(primary_mount) if primary_mount else None,
+            'children': [],
+        }
+
+    def _build_lvm_entry(self, grandchild: Dict, mountpoints: Dict) -> Dict[str, Any]:
+        """Build LVM entry from lsblk grandchild data."""
+        gc_name = grandchild.get('name', '')
+        gc_full = f"/dev/mapper/{gc_name}"
+        gc_mount_list = mountpoints.get(gc_full, [])
+        gc_all_mounts = [m['mountpoint'] for m in gc_mount_list]
+        gc_primary_mount = gc_all_mounts[0] if gc_all_mounts else ''
+        gc_fstype = gc_mount_list[0]['fstype'] if gc_mount_list else (grandchild.get('fstype') or '')
+
+        return {
+            'name': gc_name,
+            'full_path': gc_full,
+            'node_type': grandchild.get('type', ''),
+            'size': grandchild.get('size', 0),
+            'mountpoint': gc_primary_mount,
+            'mountpoints': gc_all_mounts,
+            'fstype': gc_fstype,
+            'uuid': grandchild.get('uuid', ''),
+            'usage': self._get_disk_usage(gc_primary_mount) if gc_primary_mount else None,
+        }
+
+    def _calculate_disk_usage(self, disk_entry: Dict) -> None:
+        """Calculate aggregated disk usage from all mounted children."""
+        total_used = 0
+        total_size = disk_entry['size']
+        has_mounted = False
+
+        for part in disk_entry['children']:
+            if part.get('usage'):
+                total_used += part['usage'].get('used', 0)
+                has_mounted = True
+            for lvm in part.get('children', []):
+                if lvm.get('usage'):
+                    total_used += lvm['usage'].get('used', 0)
+                    has_mounted = True
+
+        if has_mounted and total_size > 0:
+            disk_entry['usage'] = {
+                'total': total_size,
+                'used': total_used,
+                'free': total_size - total_used,
+                'percent': round((total_used / total_size) * 100, 1),
+            }
+
+    def _get_io_stats(self) -> Dict[str, Any]:
+        """Get disk I/O statistics."""
         current_io = psutil.disk_io_counters(perdisk=True)
         global_io = psutil.disk_io_counters()
         current_time = time.time()
-        dt = current_time - self._last_io_time
-        if dt <= 0:
-            dt = 1.0
+        dt = max(current_time - self._last_io_time, 1.0)
+
         per_disk_stats = {}
         if current_io:
             for disk, counters in current_io.items():
                 stats = counters._asdict()
                 if disk in self._last_disk_io:
                     prev = self._last_disk_io[disk]
-                    read_diff = counters.read_bytes - prev.read_bytes
-                    write_diff = counters.write_bytes - prev.write_bytes
-                    if read_diff < 0:
-                        read_diff = 0
-                    if write_diff < 0:
-                        write_diff = 0
+                    read_diff = max(0, counters.read_bytes - prev.read_bytes)
+                    write_diff = max(0, counters.write_bytes - prev.write_bytes)
                     stats['read_rate'] = read_diff / dt
                     stats['write_rate'] = write_diff / dt
                 else:
@@ -496,15 +514,16 @@ class SystemCollector(BaseCollector):
             self._last_disk_io = current_io
             self._last_io_time = current_time
 
-        io_stats = {
+        return {
             'read_bytes': global_io.read_bytes if global_io else 0,
             'write_bytes': global_io.write_bytes if global_io else 0,
             'read_count': global_io.read_count if global_io else 0,
             'write_count': global_io.write_count if global_io else 0,
-            'per_disk': per_disk_stats
+            'per_disk': per_disk_stats,
         }
 
-        # Build flat partitions list for System Info widget compatibility
+    def _build_partitions_list(self, hierarchy: list) -> list:
+        """Build flat partitions list for System Info widget compatibility."""
         partitions = []
         for disk in hierarchy:
             for part in disk.get('children', []):
@@ -519,7 +538,6 @@ class SystemCollector(BaseCollector):
                         'free': usage.get('free', 0),
                         'percent': usage.get('percent', 0),
                     })
-                # Also include LVM children
                 for lvm in part.get('children', []):
                     lvm_usage = lvm.get('usage')
                     if lvm_usage and lvm.get('mountpoint'):
@@ -532,12 +550,7 @@ class SystemCollector(BaseCollector):
                             'free': lvm_usage.get('free', 0),
                             'percent': lvm_usage.get('percent', 0),
                         })
-
-        return {
-            'hierarchy': hierarchy,
-            'partitions': partitions,  # For System Info widget
-            'io': io_stats,
-        }
+        return partitions
 
     def _is_ssd_model(self, model: str) -> bool:
         """Detect if disk is SSD by model name (for USB devices where rotational flag lies)."""
