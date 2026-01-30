@@ -54,3 +54,6 @@ cache/
 data/
 *.db
 secrets/
+
+# Local AI assistant config
+CLAUDE.md
