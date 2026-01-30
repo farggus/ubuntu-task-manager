@@ -45,7 +45,6 @@ custom_scripts/
 *.log.*
 logs/*
 !logs/.gitkeep
-/.gemini
 
 # Sensitive data
 .env
@@ -56,4 +55,6 @@ data/
 secrets/
 
 # Local AI assistant config
+/.gemini
 CLAUDE.md
+GEMINI.md
