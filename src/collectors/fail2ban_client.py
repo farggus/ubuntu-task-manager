@@ -5,9 +5,9 @@ This module provides a wrapper for fail2ban-client commands
 to get real-time jail status, banned IPs, and ban/unban operations.
 """
 
-import subprocess
 import re
-from typing import Dict, List, Optional, Any
+import subprocess
+from typing import Any, Dict, List, Optional
 
 from utils.logger import get_logger
 
