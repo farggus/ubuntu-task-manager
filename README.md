@@ -1,4 +1,4 @@
-# Ubuntu Task Manager (UTM) v2.0
+# Ubuntu Task Manager (UTM) v2.1
 
 Full-featured TUI dashboard for monitoring and managing Ubuntu/Linux servers directly from the terminal.
 
