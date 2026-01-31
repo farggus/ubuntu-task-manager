@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 import psutil
 
 from utils.logger import get_logger
+from utils.process_cache import get_process_list
 
 from .base import BaseCollector
 
@@ -54,26 +55,24 @@ class ProcessesCollector(BaseCollector):
         }
 
     def _get_processes(self) -> List[Dict[str, Any]]:
-        """Get list of running processes."""
+        """Get list of running processes.
+
+        Uses shared cache to avoid duplicate iteration with SystemCollector.
+        """
         processes = []
         try:
-            # Fetch all useful attributes at once
+            # Fetch all useful attributes at once (shared cache)
             attrs = [
                 'pid', 'name', 'username', 'status',
                 'cpu_percent', 'memory_percent', 'memory_info',
                 'create_time', 'cmdline', 'ppid'
             ]
 
+            # Get process list from shared cache
+            proc_infos = get_process_list(attrs)
+
             # Build PID->name map once (O(n) instead of O(n^2) for parent lookups)
-            pid_to_name = {}
-            proc_infos = []
-            for p in psutil.process_iter(attrs):
-                try:
-                    p_info = p.info
-                    pid_to_name[p_info['pid']] = p_info['name']
-                    proc_infos.append(p_info)
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    continue
+            pid_to_name = {p['pid']: p['name'] for p in proc_infos}
 
             for p_info in proc_infos:
                 try:
@@ -111,16 +110,3 @@ class ProcessesCollector(BaseCollector):
 
         # Sort by CPU usage descending by default
         return sorted(processes, key=lambda x: x['cpu'], reverse=True)
-
-    def _get_summary(self) -> Dict[str, int]:
-        """Get process summary counts."""
-        summary = {'total': 0, 'running': 0, 'sleeping': 0, 'stopped': 0, 'zombie': 0}
-        try:
-            for p in psutil.process_iter(['status']):
-                status = p.info['status']
-                summary['total'] += 1
-                if status in summary:
-                    summary[status] += 1
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-        return summary

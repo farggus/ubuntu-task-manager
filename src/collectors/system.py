@@ -18,6 +18,7 @@ import psutil
 from const import DISK_CACHE_FILE
 from utils.binaries import APT, DPKG_QUERY, LSBLK, SMARTCTL, SUDO, SYSTEMCTL
 from utils.logger import get_logger
+from utils.process_cache import get_process_stats
 
 from .base import BaseCollector
 
@@ -961,16 +962,8 @@ class SystemCollector(BaseCollector):
             return 0
 
     def _get_process_stats(self) -> Dict[str, int]:
-        """Get process count and zombies."""
-        total = 0
-        zombies = 0
-        try:
-            # Iterating processes is heavy, optimize by fetching only status
-            for p in psutil.process_iter(['status']):
-                total += 1
-                if p.info['status'] == psutil.STATUS_ZOMBIE:
-                    zombies += 1
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
+        """Get process count and zombies.
 
-        return {'total': total, 'zombies': zombies}
+        Uses shared cache to avoid duplicate iteration with ProcessesCollector.
+        """
+        return get_process_stats()

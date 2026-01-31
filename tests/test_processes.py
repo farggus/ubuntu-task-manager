@@ -191,51 +191,16 @@ class TestProcessStateCounting:
             assert data['stats']['other'] == 2
 
 
-class TestGetSummary:
-    """Tests for _get_summary method."""
-
-    def test_get_summary_returns_dict(self):
-        """Test _get_summary returns proper structure."""
-        from collectors.processes import ProcessesCollector
-        collector = ProcessesCollector()
-        summary = collector._get_summary()
-        assert isinstance(summary, dict)
-        assert 'total' in summary
-        assert 'running' in summary
-        assert 'sleeping' in summary
-
-    def test_get_summary_non_negative(self):
-        """Test _get_summary returns non-negative counts."""
-        from collectors.processes import ProcessesCollector
-        collector = ProcessesCollector()
-        summary = collector._get_summary()
-        for key, value in summary.items():
-            assert value >= 0, f"{key} should be non-negative"
-
-    @patch('collectors.processes.psutil.process_iter')
-    def test_get_summary_handles_exceptions(self, mock_iter):
-        """Test _get_summary handles process exceptions."""
-        import psutil
-        mock_iter.side_effect = psutil.NoSuchProcess(pid=1)
-
-        from collectors.processes import ProcessesCollector
-        collector = ProcessesCollector()
-        # Should not raise
-        summary = collector._get_summary()
-        assert isinstance(summary, dict)
-
-
 class TestProcessParentInfo:
     """Tests for parent process info retrieval."""
 
-    @patch('collectors.processes.psutil.Process')
-    @patch('collectors.processes.psutil.process_iter')
-    def test_parent_not_found(self, mock_iter, mock_process):
+    @patch('collectors.processes.get_process_list')
+    def test_parent_not_found(self, mock_get_list):
         """Test handling when parent process not found."""
         import psutil
         from datetime import datetime
 
-        # Mock process data
+        # Mock process data - parent PID 1 is not in the list
         mock_info = {
             'pid': 123,
             'name': 'test',
@@ -246,14 +211,10 @@ class TestProcessParentInfo:
             'memory_info': MagicMock(rss=1024*1024),
             'create_time': datetime.now().timestamp(),
             'cmdline': ['test', 'cmd'],
-            'ppid': 1
+            'ppid': 1  # Parent PID not in list
         }
 
-        mock_proc = MagicMock()
-        mock_proc.info = mock_info
-        mock_iter.return_value = [mock_proc]
-
-        mock_process.side_effect = psutil.NoSuchProcess(pid=1)
+        mock_get_list.return_value = [mock_info]
 
         from collectors.processes import ProcessesCollector
         collector = ProcessesCollector()
@@ -262,28 +223,20 @@ class TestProcessParentInfo:
         assert len(processes) == 1
         assert processes[0]['parent_name'] == '?'
 
-    @patch('collectors.processes.psutil.process_iter')
-    def test_handles_zombie_process_exception(self, mock_iter):
-        """Test handling of ZombieProcess exception during iteration."""
-        import psutil
-
-        mock_proc = MagicMock()
-        mock_proc.info = MagicMock()
-        # Accessing info raises ZombieProcess
-        type(mock_proc).info = property(lambda self: (_ for _ in ()).throw(psutil.ZombieProcess(1)))
-
-        mock_iter.return_value = [mock_proc]
+    @patch('collectors.processes.get_process_list')
+    def test_handles_empty_list(self, mock_get_list):
+        """Test handling when process list is empty."""
+        mock_get_list.return_value = []
 
         from collectors.processes import ProcessesCollector
         collector = ProcessesCollector()
         processes = collector._get_processes()
-        # Should skip the zombie process
         assert processes == []
 
-    @patch('collectors.processes.psutil.process_iter')
-    def test_handles_general_exception(self, mock_iter):
+    @patch('collectors.processes.get_process_list')
+    def test_handles_general_exception(self, mock_get_list):
         """Test handling of general exception."""
-        mock_iter.side_effect = Exception("Unexpected error")
+        mock_get_list.side_effect = Exception("Unexpected error")
 
         from collectors.processes import ProcessesCollector
         collector = ProcessesCollector()
