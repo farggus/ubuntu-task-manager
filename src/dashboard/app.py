@@ -109,13 +109,91 @@ class UTMDashboard(App):
         super().__init__()
         self.title = f"{platform.node()} UTM"
         self.config = self.load_config(config_path)
-        self.system_collector = SystemCollector(self.config)
-        self.services_collector = ServicesCollector(self.config)
-        self.network_collector = NetworkCollector(self.config)
-        self.fail2ban_collector = Fail2banCollector(self.config)
-        self.tasks_collector = TasksCollector(self.config)
-        self.processes_collector = ProcessesCollector(self.config)
-        self.users_collector = UsersCollector(self.config)
+        # Lazy-initialized collectors (created on first access)
+        self._system_collector: SystemCollector | None = None
+        self._services_collector: ServicesCollector | None = None
+        self._network_collector: NetworkCollector | None = None
+        self._fail2ban_collector: Fail2banCollector | None = None
+        self._tasks_collector: TasksCollector | None = None
+        self._processes_collector: ProcessesCollector | None = None
+        self._users_collector: UsersCollector | None = None
+
+    @property
+    def system_collector(self) -> SystemCollector:
+        """Lazy-initialized SystemCollector."""
+        if self._system_collector is None:
+            self._system_collector = SystemCollector(self.config)
+        return self._system_collector
+
+    @system_collector.setter
+    def system_collector(self, value: SystemCollector) -> None:
+        self._system_collector = value
+
+    @property
+    def services_collector(self) -> ServicesCollector:
+        """Lazy-initialized ServicesCollector."""
+        if self._services_collector is None:
+            self._services_collector = ServicesCollector(self.config)
+        return self._services_collector
+
+    @services_collector.setter
+    def services_collector(self, value: ServicesCollector) -> None:
+        self._services_collector = value
+
+    @property
+    def network_collector(self) -> NetworkCollector:
+        """Lazy-initialized NetworkCollector."""
+        if self._network_collector is None:
+            self._network_collector = NetworkCollector(self.config)
+        return self._network_collector
+
+    @network_collector.setter
+    def network_collector(self, value: NetworkCollector) -> None:
+        self._network_collector = value
+
+    @property
+    def fail2ban_collector(self) -> Fail2banCollector:
+        """Lazy-initialized Fail2banCollector."""
+        if self._fail2ban_collector is None:
+            self._fail2ban_collector = Fail2banCollector(self.config)
+        return self._fail2ban_collector
+
+    @fail2ban_collector.setter
+    def fail2ban_collector(self, value: Fail2banCollector) -> None:
+        self._fail2ban_collector = value
+
+    @property
+    def tasks_collector(self) -> TasksCollector:
+        """Lazy-initialized TasksCollector."""
+        if self._tasks_collector is None:
+            self._tasks_collector = TasksCollector(self.config)
+        return self._tasks_collector
+
+    @tasks_collector.setter
+    def tasks_collector(self, value: TasksCollector) -> None:
+        self._tasks_collector = value
+
+    @property
+    def processes_collector(self) -> ProcessesCollector:
+        """Lazy-initialized ProcessesCollector."""
+        if self._processes_collector is None:
+            self._processes_collector = ProcessesCollector(self.config)
+        return self._processes_collector
+
+    @processes_collector.setter
+    def processes_collector(self, value: ProcessesCollector) -> None:
+        self._processes_collector = value
+
+    @property
+    def users_collector(self) -> UsersCollector:
+        """Lazy-initialized UsersCollector."""
+        if self._users_collector is None:
+            self._users_collector = UsersCollector(self.config)
+        return self._users_collector
+
+    @users_collector.setter
+    def users_collector(self, value: UsersCollector) -> None:
+        self._users_collector = value
 
     def load_config(self, config_path: str) -> Dict[str, Any]:
         path = Path(config_path)
