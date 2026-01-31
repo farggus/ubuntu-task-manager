@@ -227,16 +227,6 @@ class NetworkExtendedTab(Vertical):
             fw_status_str = "[dim]none[/dim]"
         else:
             fw_status_str = f"[red]{fw_type}[/red] [dim]({fw_status})[/dim]"
-        
-        # Use fw_status_str to suppress F841 if needed, or just keep it for future use.
-        # Actually it's unused in the return string logic below... 
-        # The original code constructed it but didn't use it in the return.
-        # I will leave it but acknowledge it is unused, however to satisfy linter I should use it or remove it.
-        # But wait, looking at the code, it IS unused.
-        # I'll comment it out or mark with _ to silence unused variable warning if I don't want to change logic.
-        # Or better, I'll just not calculate it if it's not used.
-        # BUT, maybe it was intended to be used? The return string has just `current | Ifaces...`
-        # I'll stick to safe refactoring: remove it if unused.
 
         # Current view indicator
         view_labels = {
@@ -267,15 +257,7 @@ class NetworkExtendedTab(Vertical):
 
             # Filter and sort by port number
             valid_ports = [p for p in ports if 'error' not in p]
-            
-            def get_port_key(x):
-                # Helper to get port number safely
-                p_val = x.get('port', '')
-                if str(p_val).isdigit():
-                    return int(p_val)
-                return 99999
-
-            sorted_ports = sorted(valid_ports, key=get_port_key)
+            sorted_ports = sorted(valid_ports, key=lambda x: int(x.get('port', 0)) if str(x.get('port', '')).isdigit() else 99999)
 
             for p in sorted_ports:
                 try:
@@ -451,7 +433,7 @@ class NetworkExtendedTab(Vertical):
                 # Add separator/header for new chain
                 if chain != last_chain:
                     if last_chain is not None:
-                        t.add_row("", "", "", "", "", "", "")
+                         t.add_row("", "", "", "", "", "", "")
 
                     chain_text = Text(chain, style="bold cyan")
                     if policy:
@@ -588,13 +570,13 @@ class NetworkExtendedTab(Vertical):
                                     field = left['meta'].get('key', '')
 
                                 desc_parts.append(f"{field} {op} {right}")
-                            except Exception:
+                            except:
                                 desc_parts.append("match(...)")
                         elif key == 'counter':
                             pass  # Skip counters
                         else:
-                            # Convert complex dict to string representation for other keys
-                            desc_parts.append(key)
+                             # Convert complex dict to string representation for other keys
+                             desc_parts.append(key)
 
                     rule_text = ", ".join(desc_parts)
                     if not rule_text:
