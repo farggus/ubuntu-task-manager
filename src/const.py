@@ -19,6 +19,7 @@ CACHE_DIR = BASE_DIR / "cache"
 BANS_DB_FILE = os.path.join(CACHE_DIR, 'bans_db.json')
 SLOW_BOTS_FILE = os.path.join(CACHE_DIR, 'suspicious_ips.json')
 WHITELIST_FILE = os.path.join(CACHE_DIR, 'whitelist.json')
+DISK_CACHE_FILE = os.path.join(CACHE_DIR, 'disk_cache.json')
 
 # Time constants (seconds)
 SECONDS_IN_MINUTE = 60

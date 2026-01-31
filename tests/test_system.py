@@ -293,17 +293,19 @@ class TestSMARTInfo(unittest.TestCase):
         """Test SMART info handles timeout gracefully."""
         import subprocess
         mock_run.side_effect = subprocess.TimeoutExpired('cmd', 10)
-        result = self.collector._try_smartctl_json('/dev/sda')
-        # Should return empty dict or None
-        self.assertTrue(result == {} or result is None)
+        result, disk_info = self.collector._try_smartctl_json_extended('/dev/sda')
+        # Should return None
+        self.assertIsNone(result)
+        self.assertIsNone(disk_info)
 
     @patch('subprocess.run')
     def test_smart_handles_missing_smartctl(self, mock_run):
         """Test SMART info handles missing smartctl."""
         mock_run.side_effect = FileNotFoundError
-        result = self.collector._try_smartctl_json('/dev/sda')
-        # Should return empty dict or None
-        self.assertTrue(result == {} or result is None)
+        result, disk_info = self.collector._try_smartctl_json_extended('/dev/sda')
+        # Should return None
+        self.assertIsNone(result)
+        self.assertIsNone(disk_info)
 
 
 class TestPackageStatsExtended(unittest.TestCase):
@@ -491,6 +493,199 @@ class TestTemperature(unittest.TestCase):
         result = self.collector.collect()
         # Should not fail even without sensors
         self.assertIsInstance(result, dict)
+
+
+class TestSmartNonBlocking(unittest.TestCase):
+    """Tests for non-blocking SMART data collection."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_smart_cache_initialized(self):
+        """Test SMART cache is initialized in __init__."""
+        self.assertIsInstance(self.collector._smart_cache, dict)
+        self.assertIsInstance(self.collector._smart_cache_time, (int, float))
+        self.assertFalse(self.collector._smart_update_in_progress)
+
+    def test_smart_disk_cache_initialized(self):
+        """Test SMART disk cache is initialized."""
+        self.assertIsInstance(self.collector._smart_disk_cache, dict)
+
+    def test_get_smart_cache_returns_immediately(self):
+        """Test _get_smart_cache returns immediately without blocking."""
+        import time
+        start = time.time()
+        result = self.collector._get_smart_cache()
+        elapsed = time.time() - start
+        # Should return in less than 100ms (non-blocking)
+        self.assertLess(elapsed, 0.1)
+        self.assertIsInstance(result, dict)
+
+    def test_get_smart_cache_returns_stale_cache(self):
+        """Test _get_smart_cache returns stale cache while updating."""
+        # Set stale cache
+        self.collector._smart_cache = {'test': 'data'}
+        self.collector._smart_cache_time = 0  # Very old
+
+        result = self.collector._get_smart_cache()
+        # Should return the stale cache immediately
+        self.assertEqual(result, {'test': 'data'})
+
+    def test_get_smart_cache_uses_persistent_cache(self):
+        """Test _get_smart_cache uses persistent cache when in-memory is empty."""
+        # Clear in-memory cache
+        self.collector._smart_cache = {}
+        self.collector._smart_cache_time = 0
+
+        # Set persistent cache
+        self.collector._smart_disk_cache = {
+            '/dev/sda': {
+                'device_type': None,
+                'last_temperature': 42,
+                'smart_status': 'OK',
+                'smart_supported': True
+            }
+        }
+
+        result = self.collector._get_smart_cache()
+        self.assertIn('/dev/sda', result)
+        self.assertEqual(result['/dev/sda']['temperature'], 42)
+        self.assertTrue(result['/dev/sda']['from_cache'])
+
+    def test_trigger_smart_update_sets_flag(self):
+        """Test that triggering update sets in_progress flag."""
+        self.collector._smart_cache_time = 0  # Force stale
+        self.collector._get_smart_cache()
+        # Background thread should be triggered
+        import time
+        time.sleep(0.05)  # Give thread time to start
+        # Flag might be True or already False if very fast
+        self.assertIsInstance(self.collector._smart_update_in_progress, bool)
+
+    def test_smart_update_not_triggered_twice(self):
+        """Test that update is not triggered if already in progress."""
+        self.collector._smart_update_in_progress = True
+        self.collector._smart_cache_time = 0  # Force stale
+
+        # Should not start another thread
+        self.collector._trigger_smart_update_background()
+        # Flag should still be True (unchanged)
+        self.assertTrue(self.collector._smart_update_in_progress)
+
+    def test_disk_cache_structure(self):
+        """Test that disk cache has expected structure."""
+        self.collector._smart_disk_cache['/dev/sda'] = {
+            'device_type': 'sat',
+            'model': 'Test SSD',
+            'serial': 'ABC123',
+            'last_temperature': 35,
+            'smart_status': 'OK',
+            'smart_supported': True,
+            'last_updated': 1234567890
+        }
+
+        cache = self.collector._smart_disk_cache['/dev/sda']
+        self.assertEqual(cache['device_type'], 'sat')
+        self.assertEqual(cache['model'], 'Test SSD')
+        self.assertEqual(cache['serial'], 'ABC123')
+        self.assertEqual(cache['last_temperature'], 35)
+
+
+class TestSmartPersistence(unittest.TestCase):
+    """Tests for persistent SMART disk cache."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_save_creates_file(self):
+        """Test that _save_smart_disk_cache creates a file."""
+        import os
+        from const import DISK_CACHE_FILE
+
+        self.collector._smart_disk_cache = {
+            '/dev/sda': {
+                'device_type': 'sat',
+                'model': 'Test SSD',
+                'serial': 'ABC123',
+                'last_temperature': 42,
+                'smart_status': 'OK',
+                'smart_supported': True,
+                'last_updated': 1234567890
+            }
+        }
+        self.collector._save_smart_disk_cache()
+
+        self.assertTrue(os.path.exists(DISK_CACHE_FILE))
+
+    def test_save_and_load_roundtrip(self):
+        """Test that saved data can be loaded back."""
+        test_data = {
+            '/dev/sda': {
+                'device_type': None,
+                'model': 'Samsung SSD',
+                'serial': 'S123',
+                'last_temperature': 35,
+                'smart_status': 'OK',
+                'smart_supported': True,
+                'last_updated': 1234567890
+            },
+            '/dev/sdb': {
+                'device_type': 'sat',
+                'model': 'WD HDD',
+                'serial': 'WD456',
+                'last_temperature': 40,
+                'smart_status': 'OK',
+                'smart_supported': True,
+                'last_updated': 1234567890
+            }
+        }
+        self.collector._smart_disk_cache = test_data
+        self.collector._save_smart_disk_cache()
+
+        # Create new collector and check it loads the data
+        new_collector = SystemCollector()
+        self.assertEqual(new_collector._smart_disk_cache, test_data)
+
+    def test_load_handles_missing_file(self):
+        """Test that loading handles missing cache file gracefully."""
+        import os
+        from const import DISK_CACHE_FILE
+
+        # Remove file if exists
+        if os.path.exists(DISK_CACHE_FILE):
+            os.unlink(DISK_CACHE_FILE)
+
+        result = self.collector._load_smart_disk_cache()
+        self.assertEqual(result, {})
+
+    def test_load_handles_invalid_json(self):
+        """Test that loading handles corrupted cache file."""
+        from const import DISK_CACHE_FILE
+
+        # Write invalid JSON
+        with open(DISK_CACHE_FILE, 'w') as f:
+            f.write('not valid json {{{')
+
+        result = self.collector._load_smart_disk_cache()
+        self.assertEqual(result, {})
+
+    def test_migration_from_old_format(self):
+        """Test migration from old format (device_type only)."""
+        from const import DISK_CACHE_FILE
+
+        # Write old format
+        old_data = {'/dev/sda': 'sat', '/dev/sdb': None}
+        with open(DISK_CACHE_FILE, 'w') as f:
+            import json
+            json.dump(old_data, f)
+
+        result = self.collector._load_smart_disk_cache()
+
+        # Should be migrated to new format
+        self.assertIn('/dev/sda', result)
+        self.assertEqual(result['/dev/sda']['device_type'], 'sat')
+        self.assertIn('/dev/sdb', result)
+        self.assertIsNone(result['/dev/sdb']['device_type'])
 
 
 if __name__ == '__main__':

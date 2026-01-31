@@ -8,12 +8,14 @@ import re
 import shlex
 import socket
 import subprocess
+import threading
 import time
 from datetime import timedelta
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import psutil
 
+from const import DISK_CACHE_FILE
 from utils.binaries import APT, DPKG_QUERY, LSBLK, SMARTCTL, SUDO, SYSTEMCTL
 from utils.logger import get_logger
 
@@ -30,7 +32,14 @@ class SystemCollector(BaseCollector):
         self._last_io_time = time.time()
         self._pkg_cache = {'total': 0, 'updates': 0}
         self._pkg_cache_time = 0
-        
+
+        # SMART data collection (non-blocking)
+        self._smart_cache: Dict[str, Any] = {}
+        self._smart_cache_time: float = 0
+        self._smart_update_lock = threading.Lock()
+        self._smart_update_in_progress = False
+        self._smart_disk_cache: Dict[str, Dict[str, Any]] = self._load_smart_disk_cache()
+
         # Initialize CPU percent counters
         psutil.cpu_percent(interval=0, percpu=True)
         psutil.cpu_percent(interval=0)
@@ -332,24 +341,137 @@ class SystemCollector(BaseCollector):
             return None
 
     def _get_smart_cache(self) -> Dict[str, Any]:
-        """Get SMART cache, updating if stale (>5 min)."""
-        smart_cache = getattr(self, '_smart_cache', {})
-        smart_cache_time = getattr(self, '_smart_cache_time', 0)
+        """Get SMART cache (non-blocking). Triggers background update if stale.
 
-        if time.time() - smart_cache_time > 300:
+        Returns cached data from persistent storage if in-memory cache is empty.
+        This allows showing temperatures immediately on startup.
+        """
+        cache_age = time.time() - self._smart_cache_time
+
+        # If cache is stale (>5 min), trigger background update
+        if cache_age > 300:
+            self._trigger_smart_update_background()
+
+        # If in-memory cache is empty, try to use persistent cache
+        if not self._smart_cache and self._smart_disk_cache:
+            return {
+                disk: {
+                    'status': info.get('smart_status', 'N/A'),
+                    'temperature': info.get('last_temperature'),
+                    'from_cache': True
+                }
+                for disk, info in self._smart_disk_cache.items()
+                if info.get('smart_supported', True)
+            }
+
+        return self._smart_cache
+
+    def _trigger_smart_update_background(self) -> None:
+        """Start background SMART data collection if not already running."""
+        with self._smart_update_lock:
+            if self._smart_update_in_progress:
+                return
+            self._smart_update_in_progress = True
+
+        # Run in background thread
+        thread = threading.Thread(target=self._update_smart_background, daemon=True)
+        thread.start()
+
+    def _update_smart_background(self) -> None:
+        """Background worker for SMART data collection."""
+        try:
+            logger.debug("Starting background SMART data collection")
+            start_time = time.time()
+
             disk_info_map = self._get_disk_list_for_smart()
-            smart_cache = self._get_smart_info(disk_info_map)
-            self._smart_cache = smart_cache
+            smart_data = self._get_smart_info(disk_info_map)
+
+            # Update cache atomically
+            self._smart_cache = smart_data
             self._smart_cache_time = time.time()
 
-        return smart_cache
+            # Persist SMART disk cache for faster startup next time
+            self._save_smart_disk_cache()
+
+            duration = time.time() - start_time
+            logger.debug(f"SMART data collection completed in {duration:.1f}s for {len(smart_data)} disks")
+
+        except Exception as e:
+            logger.error(f"Background SMART collection failed: {e}")
+        finally:
+            with self._smart_update_lock:
+                self._smart_update_in_progress = False
+
+    def _load_smart_disk_cache(self) -> Dict[str, Dict[str, Any]]:
+        """Load disk cache from persistent storage.
+
+        Supports migration from old formats.
+        """
+        # Try new location first, then old
+        cache_file = DISK_CACHE_FILE
+        old_cache_file = str(DISK_CACHE_FILE).replace('disk_cache.json', 'smart_device_types.json')
+
+        if not os.path.exists(cache_file):
+            if os.path.exists(old_cache_file):
+                cache_file = old_cache_file
+                logger.info("Migrating from old cache file location")
+            else:
+                return {}
+
+        try:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Migrate old format: {"disk": "type"} -> {"disk": {"device_type": "type", ...}}
+            if data and isinstance(next(iter(data.values()), None), (str, type(None))):
+                logger.info("Migrating disk cache from old format")
+                data = {disk: {'device_type': dtype} for disk, dtype in data.items()}
+
+            # Save to new location if migrated
+            if cache_file != DISK_CACHE_FILE:
+                self._smart_disk_cache = data
+                self._save_smart_disk_cache()
+                try:
+                    os.remove(old_cache_file)
+                except OSError:
+                    pass
+
+            logger.debug(f"Loaded disk cache for {len(data)} disks")
+            return data
+
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to load disk cache: {e}")
+            return {}
+
+    def _save_smart_disk_cache(self) -> None:
+        """Save disk cache to persistent storage (atomic write)."""
+        try:
+            tmp_path = DISK_CACHE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(self._smart_disk_cache, f, indent=2)
+            os.replace(tmp_path, DISK_CACHE_FILE)
+            logger.debug(f"Saved disk cache for {len(self._smart_disk_cache)} disks")
+        except (IOError, OSError) as e:
+            logger.warning(f"Failed to save disk cache: {e}")
+
+    def _get_cached_smart_data(self, disk_name: str) -> Optional[Dict[str, Any]]:
+        """Get cached SMART data for instant display at startup."""
+        cache_entry = self._smart_disk_cache.get(disk_name)
+        if not cache_entry:
+            return None
+
+        return {
+            'status': cache_entry.get('smart_status', 'N/A'),
+            'temperature': cache_entry.get('last_temperature'),
+            'from_cache': True
+        }
 
     def _get_disk_list_for_smart(self) -> Dict[str, Any]:
-        """Get list of physical disks for SMART queries."""
+        """Get list of physical disks for SMART queries with extended info."""
         disk_info_map = {}
         try:
             result = subprocess.run(
-                [LSBLK, '-o', 'NAME,TYPE', '-J'],
+                [LSBLK, '-o', 'NAME,TYPE,SIZE,TRAN,ROTA,MODEL', '-J', '-b'],
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:
@@ -357,7 +479,36 @@ class SystemCollector(BaseCollector):
                 for device in lsblk_data.get('blockdevices', []):
                     if device.get('type') == 'disk':
                         name = f"/dev/{device.get('name', '')}"
-                        disk_info_map[name] = {'type': 'disk'}
+                        transport = (device.get('tran') or '').lower()
+                        is_rotational = device.get('rota', True)
+                        model = (device.get('model') or '').strip()
+                        size_bytes = device.get('size', 0)
+
+                        # Determine disk type
+                        if 'nvme' in name:
+                            disk_type = 'NVMe'
+                        elif not is_rotational or self._is_ssd_model(model):
+                            disk_type = 'SSD'
+                        else:
+                            disk_type = 'HDD'
+
+                        # Format transport
+                        transport_map = {
+                            'sata': 'SATA',
+                            'usb': 'USB',
+                            'nvme': 'NVMe',
+                            'sas': 'SAS',
+                            'ata': 'ATA',
+                            '': 'Unknown'
+                        }
+                        transport_fmt = transport_map.get(transport, transport.upper() or 'Unknown')
+
+                        disk_info_map[name] = {
+                            'type': 'disk',
+                            'disk_type': disk_type,
+                            'transport': transport_fmt,
+                            'size_bytes': size_bytes,
+                        }
         except (json.JSONDecodeError, FileNotFoundError, subprocess.TimeoutExpired):
             pass
         return disk_info_map
@@ -572,35 +723,94 @@ class SystemCollector(BaseCollector):
             if 'loop' in disk_name or 'mapper' in disk_name:
                 continue
 
-            # Try different device types for USB bridges
-            device_types = [None, 'sat', 'usbsunplus', 'usbjmicron', 'usbcypress', 'usbprolific']
-
-            best_result = None
-            for dev_type in device_types:
-                result = self._try_smartctl_json(disk_name, dev_type)
-                if result:
-                    # Keep the result with temperature if we have one
-                    if result.get('temperature') is not None:
-                        best_result = result
-                        break  # Found temperature, stop trying
-                    elif best_result is None:
-                        best_result = result  # Keep first valid result as fallback
-
-            if best_result:
-                smart_info[disk_name] = best_result
-
-            # Fallback: try reading temperature from sysfs
-            if disk_name not in smart_info:
-                temp = self._get_temp_from_sysfs(disk_name)
-                if temp is not None:
-                    smart_info[disk_name] = {'status': 'N/A', 'temperature': temp}
+            result = self._get_smart_for_disk(disk_name, info)
+            if result:
+                smart_info[disk_name] = result
 
         return smart_info
 
-    def _try_smartctl_json(self, disk_name: str, device_type: str = None) -> Dict[str, Any]:
-        """Try to get SMART info via smartctl JSON output."""
+    def _get_smart_for_disk(self, disk_name: str,
+                             lsblk_info: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """Get SMART data for a single disk, using cached device_type if known."""
+        cache_entry = self._smart_disk_cache.get(disk_name, {})
+        cached_type = cache_entry.get('device_type')
+        cached_serial = cache_entry.get('serial')
+
+        # Check if SMART was previously marked as unsupported
+        if cache_entry.get('smart_supported') is False:
+            return None
+
+        # First, try known working device_type from cache
+        if cached_type is not None or 'device_type' in cache_entry:
+            result, disk_info = self._try_smartctl_json_extended(disk_name, cached_type)
+            if result and result.get('temperature') is not None:
+                # Verify it's the same disk (serial match)
+                if cached_serial and disk_info.get('serial') and cached_serial != disk_info.get('serial'):
+                    logger.info(f"Disk {disk_name} serial changed, re-probing device type")
+                else:
+                    self._update_disk_cache(disk_name, cached_type, result, disk_info, lsblk_info)
+                    return result
+            # Cached type no longer works, will re-probe below
+
+        # Try different device types for USB bridges
+        device_types = [None, 'sat', 'usbsunplus', 'usbjmicron', 'usbcypress', 'usbprolific']
+
+        best_result = None
+        best_type = None
+        best_disk_info = None
+
+        for dev_type in device_types:
+            result, disk_info = self._try_smartctl_json_extended(disk_name, dev_type)
+            if result:
+                if result.get('temperature') is not None:
+                    # Found temperature - cache and return
+                    self._update_disk_cache(disk_name, dev_type, result, disk_info, lsblk_info)
+                    return result
+                elif best_result is None:
+                    best_result = result
+                    best_type = dev_type
+                    best_disk_info = disk_info
+
+        # Cache best working type even without temperature
+        if best_result:
+            self._update_disk_cache(disk_name, best_type, best_result, best_disk_info, lsblk_info)
+            return best_result
+
+        # Fallback: try reading temperature from sysfs
+        temp = self._get_temp_from_sysfs(disk_name)
+        if temp is not None:
+            return {'status': 'N/A', 'temperature': temp}
+
+        # Mark as unsupported to skip in future
+        self._smart_disk_cache[disk_name] = {
+            'device_type': None,
+            'smart_supported': False,
+            'last_updated': int(time.time())
+        }
+        return None
+
+    def _update_disk_cache(self, disk_name: str, device_type: Optional[str],
+                           result: Dict[str, Any], disk_info: Optional[Dict[str, Any]],
+                           lsblk_info: Optional[Dict[str, Any]] = None) -> None:
+        """Update the disk cache with latest data."""
+        self._smart_disk_cache[disk_name] = {
+            'device_type': device_type,
+            'model': disk_info.get('model') if disk_info else None,
+            'serial': disk_info.get('serial') if disk_info else None,
+            'disk_type': lsblk_info.get('disk_type') if lsblk_info else None,
+            'transport': lsblk_info.get('transport') if lsblk_info else None,
+            'size_bytes': lsblk_info.get('size_bytes') if lsblk_info else None,
+            'last_temperature': result.get('temperature'),
+            'smart_status': result.get('status', 'N/A'),
+            'smart_supported': True,
+            'last_updated': int(time.time())
+        }
+
+    def _try_smartctl_json_extended(self, disk_name: str, device_type: Optional[str] = None
+                                     ) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        """Try to get SMART info via smartctl JSON output. Returns (smart_result, disk_info)."""
         try:
-            cmd = [SMARTCTL, '-H', '-A', '-j']
+            cmd = [SMARTCTL, '-H', '-A', '-i', '-j']  # Added -i for disk info
             if device_type:
                 cmd.extend(['-d', device_type])
             cmd.append(disk_name)
@@ -608,12 +818,24 @@ class SystemCollector(BaseCollector):
             if os.geteuid() != 0:
                 cmd = [SUDO] + cmd
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            proc_result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
-            if not result.stdout or 'specify device type' in result.stdout.lower():
-                return None
+            if not proc_result.stdout or 'specify device type' in proc_result.stdout.lower():
+                return None, None
 
-            data = json.loads(result.stdout)
+            data = json.loads(proc_result.stdout)
+
+            # Extract disk info (model, serial)
+            disk_info = {}
+            if 'model_name' in data:
+                disk_info['model'] = data.get('model_name', '').strip()
+            elif 'scsi_model_name' in data:
+                disk_info['model'] = data.get('scsi_model_name', '').strip()
+
+            if 'serial_number' in data:
+                disk_info['serial'] = data.get('serial_number', '').strip()
+            elif 'scsi_serial_number' in data:
+                disk_info['serial'] = data.get('scsi_serial_number', '').strip()
 
             # SMART status
             smart_status = 'OK'
@@ -649,10 +871,11 @@ class SystemCollector(BaseCollector):
                 if nvme_temp:
                     temp = nvme_temp.get('temperature')
 
-            return {'status': smart_status, 'temperature': temp}
+            return {'status': smart_status, 'temperature': temp}, disk_info
 
-        except (json.JSONDecodeError, FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError, Exception):
-            return None
+        except (json.JSONDecodeError, FileNotFoundError, subprocess.TimeoutExpired,
+                subprocess.SubprocessError, Exception):
+            return None, None
 
     def _get_temp_from_sysfs(self, disk_name: str) -> int:
         """Try to read disk temperature from sysfs hwmon."""
