@@ -4,8 +4,8 @@ This module provides a cached wrapper around psutil.process_iter() to avoid
 duplicate iterations across collectors (SystemCollector and ProcessesCollector).
 """
 
-import time
 import threading
+import time
 from typing import Any, Dict, List, Optional
 
 import psutil
