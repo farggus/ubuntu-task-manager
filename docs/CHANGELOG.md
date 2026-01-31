@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.2.0](https://github.com/farggus/ubuntu-task-manager/compare/v2.1.0...v2.2.0) (2026-01-31)
+
+
+### Features
+
+* **processes:** add column sorting and optimize performance ([612b6d0](https://github.com/farggus/ubuntu-task-manager/commit/612b6d03fa0ae2ad4e5648f2c74fb7837ea007a6))
+* **ui:** graceful degradation for unavailable services ([052f761](https://github.com/farggus/ubuntu-task-manager/commit/052f7612aaa6b70005db0ecdc3a306531e24b574))
+
+
+### Bug Fixes
+
+* **tests:** extract _do_export_snapshot for testability ([7835659](https://github.com/farggus/ubuntu-task-manager/commit/783565953d4a58f30bfe58682d829145ed89fea9))
+
+
+### Performance Improvements
+
+* **collectors:** shared process cache to avoid duplicate iteration ([04087ae](https://github.com/farggus/ubuntu-task-manager/commit/04087aeb4f042ce5b5fe12e1278b9c6e3e8c2d86)), closes [#13](https://github.com/farggus/ubuntu-task-manager/issues/13)
+* **collectors:** single systemctl call in _get_service_stats() ([bf8886d](https://github.com/farggus/ubuntu-task-manager/commit/bf8886de7704eb154c86e49fd4d2f7cb9cc82f29))
+* **dashboard:** non-blocking export_snapshot with [@work](https://github.com/work) ([530da43](https://github.com/farggus/ubuntu-task-manager/commit/530da43794b6fe24eb3e6aee6b932f6b3dbe6865))
+* **dashboard:** refresh only active tab instead of all widgets ([f5e884f](https://github.com/farggus/ubuntu-task-manager/commit/f5e884fd96dd091b831908bcdd59caf3296d7f06))
+* **logging:** quick preview + background full load ([c0782d9](https://github.com/farggus/ubuntu-task-manager/commit/c0782d9558d3ca4555e1b55a1ef191a0850f1823))
+* **system:** non-blocking SMART collection with extended disk cache ([60c2020](https://github.com/farggus/ubuntu-task-manager/commit/60c2020e24753c10bc028a61fe5d0d8922a11a67))
+* **widgets:** lazy data loading with on_show instead of on_mount ([11df2cc](https://github.com/farggus/ubuntu-task-manager/commit/11df2cc87105381540e1399e6b975f72bcfb73ae))
+
+
+### Documentation
+
+* update version to 2.1 and document lazy loading pattern ([a94d207](https://github.com/farggus/ubuntu-task-manager/commit/a94d2076b2d2273e4728bf4cfeea5d0f466247fc))
+
 ## [2.1.0](https://github.com/farggus/ubuntu-task-manager/compare/v2.0.0...v2.1.0) (2026-01-30)
 
 
