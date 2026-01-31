@@ -1,7 +1,7 @@
 """Network information collector."""
 
 import subprocess
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import psutil
 
@@ -32,11 +32,12 @@ class NetworkCollector(BaseCollector):
         Returns:
             Dictionary with network data
         """
+        network_cfg = self.config.get('network', {})
         return {
             'interfaces': self._get_interfaces(),
             'connections': self._get_connections(),
-            'open_ports': self._get_open_ports() if self.config.get('network', {}).get('check_open_ports', True) else None,
-            'firewall': self._get_firewall_rules() if self.config.get('network', {}).get('check_firewall', True) else None,
+            'open_ports': self._get_open_ports() if network_cfg.get('check_open_ports', True) else None,
+            'firewall': self._get_firewall_rules() if network_cfg.get('check_firewall', True) else None,
             'iptables': self._get_iptables_detailed(),
             'nftables': self._get_nftables_rules(),
             'routing': self._get_routing_table(),
@@ -324,7 +325,7 @@ class NetworkCollector(BaseCollector):
     def _get_nftables_rules(self) -> Dict[str, Any]:
         """Get nftables ruleset in JSON format."""
         import json
-        
+
         if not NFT:
             return {'error': 'nft binary not found'}
 
@@ -364,4 +365,3 @@ class NetworkCollector(BaseCollector):
             return routes
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return [{'error': 'Unable to get routing table'}]
-

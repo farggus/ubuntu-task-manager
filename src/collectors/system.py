@@ -4,8 +4,6 @@ import datetime
 import json
 import os
 import platform
-import re
-import shlex
 import socket
 import subprocess
 import threading
@@ -23,6 +21,7 @@ from utils.process_cache import get_process_stats
 from .base import BaseCollector
 
 logger = get_logger(__name__)
+
 
 class SystemCollector(BaseCollector):
     """Collects system information (CPU, RAM, disk, uptime, OS info)."""
@@ -78,7 +77,7 @@ class SystemCollector(BaseCollector):
         updates = 0
         upgradable_list = []
         all_packages = []
-        
+
         try:
             # 1. Get all installed packages (fast)
             res_total = subprocess.run(
@@ -92,9 +91,9 @@ class SystemCollector(BaseCollector):
                     parts = line.split()
                     if len(parts) >= 2:
                         all_packages.append({
-                            'name': parts[0], 
+                            'name': parts[0],
                             'current_version': parts[1],
-                            'new_version': '-' # No update available
+                            'new_version': '-'  # No update available
                         })
 
             # 2. Get list of upgradable packages using apt list --upgradable
@@ -102,15 +101,15 @@ class SystemCollector(BaseCollector):
                 [APT, 'list', '--upgradable'],
                 capture_output=True, text=True, timeout=10
             )
-            
+
             if res_list.returncode == 0:
                 lines = res_list.stdout.splitlines()
                 upgradable_names = []
-                
+
                 for line in lines:
                     if "..." in line or not line.strip():
                         continue
-                    
+
                     # Format: package/release series version arch ...
                     try:
                         parts = line.split('/')
@@ -124,32 +123,32 @@ class SystemCollector(BaseCollector):
                             upgradable_list.append({
                                 'name': pkg_name,
                                 'new_version': new_ver,
-                                'current_version': '?' # Placeholder
+                                'current_version': '?'  # Placeholder
                             })
                             upgradable_names.append(pkg_name)
                     except (IndexError, ValueError):
                         pass
-                
+
                 # Enhance with current versions using dpkg-query (reliable)
                 if upgradable_names:
                     # Get current versions for these packages
                     # dpkg-query -W -f='${Package} ${Version}\n' [names...]
                     # But command line might be too long. Let's use the all_packages map we already have!
-                    
+
                     # We already fetched all_packages in step 1. Let's use it.
                     installed_map = {p['name']: p['current_version'] for p in all_packages}
-                    
+
                     for pkg in upgradable_list:
                         name = pkg['name']
                         if name in installed_map:
                             pkg['current_version'] = installed_map[name]
-                
+
                 updates = len(upgradable_list)
 
             # Update all_packages with upgradable info
             # Create a dict for faster lookup
             upgradable_map = {p['name']: p for p in upgradable_list}
-            
+
             # Mark updates in all_packages
             for p in all_packages:
                 if p['name'] in upgradable_map:
@@ -164,7 +163,7 @@ class SystemCollector(BaseCollector):
                 apt_check_path = "/usr/lib/update-notifier/apt-check"
                 if os.path.exists(apt_check_path):
                     res_upd = subprocess.run(
-                        [apt_check_path], 
+                        [apt_check_path],
                         capture_output=True, text=True, timeout=10
                     )
                     if res_upd.returncode == 0:
@@ -175,7 +174,7 @@ class SystemCollector(BaseCollector):
             pass
 
         self._pkg_cache = {
-            'total': total, 
+            'total': total,
             'updates': updates,
             'upgradable_list': upgradable_list,
             'all_packages': all_packages
@@ -222,7 +221,7 @@ class SystemCollector(BaseCollector):
             'machine': platform.machine(),
             'processor': platform.processor(),
         }
-        
+
         # Try to get a pretty name (e.g. "Ubuntu 24.04.1 LTS")
         pretty_name = f"{os_info['system']} {os_info['release']}"
         try:
@@ -240,14 +239,14 @@ class SystemCollector(BaseCollector):
                                 break
         except Exception:
             pass
-            
+
         os_info['pretty_name'] = pretty_name
         return os_info
 
     def _get_cpu_info(self) -> Dict[str, Any]:
         """Get CPU information."""
         cpu_freq = psutil.cpu_freq()
-        
+
         # Try to get temperature
         temp = 0.0
         try:
@@ -725,8 +724,9 @@ class SystemCollector(BaseCollector):
 
         return smart_info
 
-    def _get_smart_for_disk(self, disk_name: str,
-                             lsblk_info: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def _get_smart_for_disk(
+            self, disk_name: str,
+            lsblk_info: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """Get SMART data for a single disk, using cached device_type if known."""
         cache_entry = self._smart_disk_cache.get(disk_name, {})
         cached_type = cache_entry.get('device_type')
@@ -802,8 +802,9 @@ class SystemCollector(BaseCollector):
             'last_updated': int(time.time())
         }
 
-    def _try_smartctl_json_extended(self, disk_name: str, device_type: Optional[str] = None
-                                     ) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    def _try_smartctl_json_extended(
+            self, disk_name: str,
+            device_type: Optional[str] = None) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
         """Try to get SMART info via smartctl JSON output. Returns (smart_result, disk_info)."""
         try:
             cmd = [SMARTCTL, '-H', '-A', '-i', '-j']  # Added -i for disk info
@@ -892,11 +893,11 @@ class SystemCollector(BaseCollector):
         """Get system uptime, trying to read host uptime if in container."""
         uptime_seconds = 0.0
         boot_time = 0.0
-        
+
         # Check for host proc mounts common in containers
         host_proc_paths = ['/host/proc/uptime', '/host_proc/uptime']
         found_host_uptime = False
-        
+
         for path in host_proc_paths:
             if os.path.exists(path):
                 try:
@@ -907,7 +908,7 @@ class SystemCollector(BaseCollector):
                         break
                 except Exception:
                     pass
-        
+
         if not found_host_uptime:
             # Fallback to standard psutil (container or host native)
             boot_time = psutil.boot_time()
@@ -920,7 +921,7 @@ class SystemCollector(BaseCollector):
             'uptime_seconds': int(uptime_seconds),
             'uptime_formatted': str(uptime_delta),
         }
-        
+
     def _get_primary_ip(self) -> Dict[str, str]:
         """Get primary interface IP."""
         ip = "N/A"
@@ -937,7 +938,7 @@ class SystemCollector(BaseCollector):
                 ip = '127.0.0.1'
             finally:
                 s.close()
-            
+
             # Find interface name for this IP
             for iface, addrs in psutil.net_if_addrs().items():
                 for addr in addrs:

@@ -1,6 +1,5 @@
 """Services collector for systemd and Docker."""
 
-import shlex
 import subprocess
 from typing import Any, Dict, List, Optional
 
@@ -64,17 +63,17 @@ class ServicesCollector(BaseCollector):
                 text=True,
                 timeout=5
             )
-            
+
             if result.returncode == 0:
                 for line in result.stdout.splitlines():
                     parts = line.split()
                     if len(parts) >= 2:
                         unit = parts[0]
                         user = parts[1]
-                        
+
                         if unit != '-' and unit.endswith('.service'):
                             service_name = unit.replace('.service', '')
-                            # Only store if not already found (prioritize first found?) 
+                            # Only store if not already found (prioritize first found?)
                             # or just overwrite. ps might show multiple processes.
                             # Usually the main process is enough.
                             if service_name not in user_map:
@@ -88,7 +87,7 @@ class ServicesCollector(BaseCollector):
         try:
             # Get users mapping first
             users_map = self._get_service_users_map()
-            
+
             result = subprocess.run(
                 [SYSTEMCTL, 'list-units', '--type=service', '--all', '--no-pager', '--no-legend'],
                 capture_output=True,
@@ -99,26 +98,27 @@ class ServicesCollector(BaseCollector):
             services = []
             for line in result.stdout.splitlines():
                 line = line.strip()
-                if not line: continue
-                
+                if not line:
+                    continue
+
                 # Handle bullet points systemd sometimes adds
                 if line.startswith('●') or line.startswith('*'):
                     line = line[1:].strip()
-                
+
                 parts = line.split(None, 4)
                 if len(parts) >= 4:
                     service_name = parts[0].replace('.service', '')
-                    
+
                     # Filter out obviously bad names
                     if not service_name or service_name in ['●', '*', '-']:
                         continue
-                    
+
                     # Look up user
                     user = users_map.get(service_name, '')
-                    
+
                     # If active but no user found in ps, likely root (kernel threads or quick tasks)
                     # But better leave empty or 'root?' if unsure. Let's leave empty.
-                        
+
                     services.append({
                         'name': service_name,
                         'load': parts[1],
@@ -184,7 +184,7 @@ class ServicesCollector(BaseCollector):
                         if ip:
                             ip_address = ip
                             break
-                
+
                 stack_name = container.labels.get('com.docker.compose.project', '')
 
                 containers.append({

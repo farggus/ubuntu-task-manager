@@ -27,7 +27,7 @@ class ProcessesCollector(BaseCollector):
     def collect(self) -> Dict[str, Any]:
         """Collect processes information and statistics."""
         processes = self._get_processes()
-        
+
         stats = {
             'total': len(processes),
             'running': 0,
@@ -35,10 +35,10 @@ class ProcessesCollector(BaseCollector):
             'zombies': 0,
             'other': 0
         }
-        
+
         for p in processes:
             status = p.get('status')
-            
+
             # Use if/elif/else to prevent double counting
             if status == psutil.STATUS_RUNNING or (p.get('cpu', 0.0) > 0.0 and status == psutil.STATUS_SLEEPING):
                 stats['running'] += 1
