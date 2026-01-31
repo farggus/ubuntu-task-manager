@@ -17,9 +17,8 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from const import APP_NAME, APP_VERSION, DEFAULT_CONFIG, LOGGER_PREFIX, SLOW_BOTS_FILE  # noqa: E402
-from dashboard import UTMDashboard  # noqa: E402
 from utils.logger import setup_exception_logging, setup_logging  # noqa: E402
-
+from dashboard import UTMDashboard  # noqa: E402
 
 # Load environment variables from .env file
 load_dotenv()
