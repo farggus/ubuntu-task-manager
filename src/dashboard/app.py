@@ -280,12 +280,13 @@ class UTMDashboard(App):
         except Exception as e:
             logger.debug(f"Could not refresh active tab: {e}")
 
+    @work(thread=True)
     def action_export_snapshot(self) -> None:
-        """Export current state of all collectors to a JSON file."""
+        """Export current state of all collectors to a JSON file (non-blocking)."""
         try:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"utm_snapshot_{timestamp}.json"
-            
+
             # Collect data from all collectors
             snapshot = {
                 "timestamp": datetime.now().isoformat(),
@@ -294,19 +295,19 @@ class UTMDashboard(App):
                 "services": self.services_collector.get_data(),
                 "network": self.network_collector.get_data(),
                 "tasks": self.tasks_collector.get_data(),
-                "processes": self.processes_collector.get_data(), # Note: this might be large
+                "processes": self.processes_collector.get_data(),
                 "users": self.users_collector.get_data()
             }
-            
+
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(snapshot, f, indent=2, default=str)
-                
+
             logger.info(f"Snapshot exported to {filename}")
-            self.notify(f"Snapshot saved to {filename}", severity="information")
-            
+            self.call_from_thread(self.notify, f"Snapshot saved to {filename}", severity="information")
+
         except Exception as e:
             logger.error(f"Failed to export snapshot: {e}")
-            self.notify(f"Export failed: {e}", severity="error")
+            self.call_from_thread(self.notify, f"Export failed: {e}", severity="error")
 
     def action_switch_tab(self, tab_id: str) -> None:
         tabs = self.query_one(TabbedContent)
