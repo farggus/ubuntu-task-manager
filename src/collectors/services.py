@@ -208,11 +208,17 @@ class ServicesCollector(BaseCollector):
             }
         except ImportError:
             logger.debug("Docker library not available")
-            return {'error': 'Docker library not available'}
+            return {'error': 'Docker library not installed', 'error_type': 'not_installed'}
         except Exception as e:
             error_str = str(e)
             if "Permission denied" in error_str:
                 logger.warning("Docker permission denied")
-                return {'error': 'Permission denied. Try running with sudo or add user to "docker" group.'}
+                return {'error': 'Permission denied (add user to "docker" group)', 'error_type': 'permission'}
+            if "Connection refused" in error_str or "connection refused" in error_str:
+                logger.warning("Docker daemon not running")
+                return {'error': 'Docker daemon not running', 'error_type': 'not_running'}
+            if "FileNotFoundError" in error_str or "No such file" in error_str:
+                logger.warning("Docker not installed")
+                return {'error': 'Docker not installed', 'error_type': 'not_installed'}
             logger.error(f"Failed to get Docker containers: {e}")
-            return {'error': f'Failed to get Docker containers: {error_str}'}
+            return {'error': f'Docker error: {error_str}', 'error_type': 'unknown'}

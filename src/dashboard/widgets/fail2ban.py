@@ -520,6 +520,11 @@ class Fail2banTab(Vertical):
 
     def _update_header(self, header: Label, f2b: Dict) -> None:
         """Update header with unified 2-line status info."""
+        # Show error message if present
+        if f2b.get('error'):
+            header.update(f"[bold red]⚠ {f2b['error']}[/bold red]")
+            return
+
         # Collect global stats
         jails = [j for j in f2b.get('jails', []) if j.get('name') not in VIRTUAL_JAILS]
         total_banned = sum(j.get('currently_banned', 0) for j in jails)
@@ -570,12 +575,17 @@ class Fail2banTab(Vertical):
         """Populate table based on current tab."""
 
         def populate(t: DataTable) -> None:
+            # Show error message if present
+            if f2b.get('error'):
+                t.add_row(f"⚠ {f2b['error']}", *[""] * 8)
+                return
+
             if not f2b or not f2b.get('installed'):
-                t.add_row("fail2ban not installed", *[""] * 8)
+                t.add_row("⚠ fail2ban not installed", *[""] * 8)
                 return
 
             if not f2b.get('running'):
-                t.add_row("fail2ban not running", *[""] * 8)
+                t.add_row("⚠ fail2ban not running", *[""] * 8)
                 return
 
             if self._current_tab == SubTab.ACTIVE:

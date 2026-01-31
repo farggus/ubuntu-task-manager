@@ -176,15 +176,22 @@ class ContainersTab(Vertical):
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:
         data = self.collector.update()
-        if data.get('error'):
-            self.notify(f"Collector Error: {data['error']}", severity="error")
-        self.app.call_from_thread(self.update_table, data.get('docker', {}))
+        docker_data = data.get('docker') or {}
+        self.app.call_from_thread(self.update_table, docker_data)
 
     def update_table(self, data: Dict[str, Any]) -> None:
         table = self.query_one(DataTable)
-        
+        header = self.query_one("#container_header", Label)
+
+        # Handle errors from collector
+        if data.get('error'):
+            error_msg = data['error']
+            header.update(f"[bold red]⚠ {error_msg}[/bold red]")
+            table.clear()
+            return
+
         containers = data.get('containers', [])
-        
+
         def populate(t):
             # Filter
             filtered_list: List[Dict[str, Any]] = []
@@ -206,7 +213,7 @@ class ContainersTab(Vertical):
                 image = container.get('image', '')
                 status = container.get('status', '')
                 ip_address = container.get('ip_address', 'N/A')
-                
+
                 ports_dict = container.get('ports', {})
                 ports_list = []
                 if ports_dict:
@@ -215,21 +222,21 @@ class ContainersTab(Vertical):
                             for host_spec in host_list:
                                 ports_list.append(f"{host_spec['HostIp']}:{host_spec['HostPort']}->{internal}")
                 ports_str = ", ".join(ports_list)
-                
+
                 style = "green" if "running" in status.lower() else "red" if "exited" in status.lower() else "yellow"
                 t.add_row(cid, name, stack, image, Text(status, style=style), ip_address, ports_str)
 
         update_table_preserving_scroll(table, populate)
-        
+
         # Update Header
         total = data.get('total', 0)
         running = data.get('running', 0)
         stopped = data.get('stopped', 0)
-        
+
         stopped_color = "red" if stopped > 0 else "green"
         header_text = (
             f"[bold cyan]Total: {total}[/bold cyan] | "
             f"[bold green]Running: {running}[/bold green] | "
             f"[bold {stopped_color}]Stopped: {stopped}[/bold {stopped_color}]"
         )
-        self.query_one("#container_header", Label).update(header_text)
+        header.update(header_text)

@@ -198,10 +198,20 @@ class Fail2banCollector(BaseCollector):
 
         except FileNotFoundError:
             logger.debug("fail2ban-client not found")
+            result['error'] = 'fail2ban not installed'
+            result['error_type'] = 'not_installed'
         except subprocess.TimeoutExpired:
             logger.warning("fail2ban-client timed out")
+            result['error'] = 'fail2ban-client timed out'
+            result['error_type'] = 'timeout'
+        except PermissionError:
+            logger.warning("Permission denied accessing fail2ban")
+            result['error'] = 'Permission denied (requires sudo)'
+            result['error_type'] = 'permission'
         except Exception as e:
             logger.error(f"Error collecting fail2ban status: {e}")
+            result['error'] = f'Error: {e}'
+            result['error_type'] = 'unknown'
 
         return result
 
