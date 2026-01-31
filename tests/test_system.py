@@ -359,15 +359,19 @@ class TestServiceStatsExtended(unittest.TestCase):
         self.collector = SystemCollector()
 
     @patch('collectors.system.subprocess.run')
-    def test_service_stats_parses_failed(self, mock_run):
-        """Test parsing of failed services."""
+    def test_service_stats_parses_failed_and_active(self, mock_run):
+        """Test parsing of failed and active services."""
+        # Format: UNIT LOAD ACTIVE SUB DESCRIPTION (--no-legend removes header)
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout='  UNIT                  LOAD   ACTIVE SUB    DESCRIPTION\nfailed.service        loaded failed failed Test\n\n1 loaded units listed.'
+            stdout='nginx.service        loaded active  running HTTP server\n'
+                   'docker.service       loaded active  running Docker\n'
+                   'failed.service       loaded failed  failed  Test\n'
         )
 
         result = self.collector._get_service_stats()
-        self.assertIn('failed', result)
+        self.assertEqual(result['failed'], 1)
+        self.assertEqual(result['active'], 2)
 
     @patch('collectors.system.subprocess.run')
     def test_service_stats_file_not_found(self, mock_run):

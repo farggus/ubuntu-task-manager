@@ -184,39 +184,34 @@ class SystemCollector(BaseCollector):
         return self._pkg_cache
 
     def _get_service_stats(self) -> Dict[str, int]:
-        """Get systemd service statistics (failed count)."""
+        """Get systemd service statistics (failed and active counts).
+
+        Uses single systemctl call with --all flag and counts statuses in Python.
+        Output format: UNIT LOAD ACTIVE SUB DESCRIPTION
+        """
         failed = 0
-        total = 0 # Getting total is expensive, maybe just failed is enough?
-        # Let's try to get failed count quickly
+        active = 0
         try:
-            # systemctl list-units --state=failed --no-legend --count
-            # Output is usually just number of lines if piped to wc -l, or we parse.
-            # actually --count prints a summary at end, without it it prints lines.
-            
             result = subprocess.run(
-                [SYSTEMCTL, 'list-units', '--state=failed', '--no-legend'],
+                [SYSTEMCTL, 'list-units', '--type=service', '--no-legend', '--all'],
                 capture_output=True,
                 text=True,
-                timeout=2
+                timeout=3
             )
             if result.returncode == 0:
-                failed = len([l for l in result.stdout.splitlines() if l.strip()])
-                
-            # For total services, we can get active ones quickly
-            # systemctl list-units --type=service --no-legend
-            res_total = subprocess.run(
-                [SYSTEMCTL, 'list-units', '--type=service', '--state=active', '--no-legend'],
-                capture_output=True,
-                text=True,
-                timeout=2
-            )
-            if res_total.returncode == 0:
-                total = len([l for l in res_total.stdout.splitlines() if l.strip()])
-                
+                for line in result.stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        # Column 3 is ACTIVE state: active, inactive, failed, etc.
+                        state = parts[2]
+                        if state == 'failed':
+                            failed += 1
+                        elif state == 'active':
+                            active += 1
         except Exception:
             pass
-            
-        return {'failed': failed, 'active': total}
+
+        return {'failed': failed, 'active': active}
 
     def _get_os_info(self) -> Dict[str, str]:
         """Get OS information."""
