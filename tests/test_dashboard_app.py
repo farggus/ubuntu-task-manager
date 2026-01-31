@@ -272,7 +272,7 @@ class TestActionExportSnapshot(unittest.TestCase):
             original_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                self.app.action_export_snapshot()
+                self.app._do_export_snapshot()
 
                 # Find created file
                 files = list(Path(tmpdir).glob("utm_snapshot_*.json"))
@@ -296,7 +296,7 @@ class TestActionExportSnapshot(unittest.TestCase):
             original_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                self.app.action_export_snapshot()
+                self.app._do_export_snapshot()
 
                 self.app.notify.assert_called_once()
                 self.assertIn("Snapshot", self.app.notify.call_args[0][0])
@@ -307,7 +307,7 @@ class TestActionExportSnapshot(unittest.TestCase):
         """Should handle export errors gracefully."""
         self.app.system_collector.get_data.side_effect = Exception("Test error")
 
-        self.app.action_export_snapshot()
+        self.app._do_export_snapshot()
 
         self.app.notify.assert_called_once()
         call_kwargs = self.app.notify.call_args[1]

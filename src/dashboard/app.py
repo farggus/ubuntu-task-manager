@@ -282,7 +282,15 @@ class UTMDashboard(App):
 
     @work(thread=True)
     def action_export_snapshot(self) -> None:
-        """Export current state of all collectors to a JSON file (non-blocking)."""
+        """Export current state of all collectors to a JSON file (non-blocking wrapper)."""
+        self._do_export_snapshot(notify_via_thread=True)
+
+    def _do_export_snapshot(self, notify_via_thread: bool = False) -> None:
+        """Export current state of all collectors to a JSON file.
+
+        Args:
+            notify_via_thread: If True, use call_from_thread for notifications (when called from @work).
+        """
         try:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"utm_snapshot_{timestamp}.json"
@@ -303,11 +311,17 @@ class UTMDashboard(App):
                 json.dump(snapshot, f, indent=2, default=str)
 
             logger.info(f"Snapshot exported to {filename}")
-            self.call_from_thread(self.notify, f"Snapshot saved to {filename}", severity="information")
+            if notify_via_thread:
+                self.call_from_thread(self.notify, f"Snapshot saved to {filename}", severity="information")
+            else:
+                self.notify(f"Snapshot saved to {filename}", severity="information")
 
         except Exception as e:
             logger.error(f"Failed to export snapshot: {e}")
-            self.call_from_thread(self.notify, f"Export failed: {e}", severity="error")
+            if notify_via_thread:
+                self.call_from_thread(self.notify, f"Export failed: {e}", severity="error")
+            else:
+                self.notify(f"Export failed: {e}", severity="error")
 
     def action_switch_tab(self, tab_id: str) -> None:
         tabs = self.query_one(TabbedContent)
