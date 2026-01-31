@@ -72,6 +72,7 @@ class ProcessesTab(Vertical):
         self.sort_column = "CPU%"  # Default sort column
         self.sort_reverse = True  # Default descending (highest CPU first)
         self._last_data: Dict[str, Any] = {}  # Cache for re-sorting
+        self._data_loaded = False  # Lazy loading flag
 
     def compose(self):
         # Header
@@ -82,10 +83,15 @@ class ProcessesTab(Vertical):
         yield DataTable(id="proc_table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        """Setup table and start updates."""
+        """Setup table structure (no data loading)."""
         table = self.query_one(DataTable)
         table.add_columns("PID", "Name", "User", "Status", "CPU%", "Mem%", "Parent", "Command")
-        self.update_data()
+
+    def on_show(self) -> None:
+        """Load data when tab becomes visible."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self.update_data()
 
     def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
         """Handle click on column header to sort by that column."""

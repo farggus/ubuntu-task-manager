@@ -97,6 +97,7 @@ class DisksTab(Vertical):
         super().__init__()
         self.collector = collector
         self._hierarchy = []  # Store for SMART lookup
+        self._data_loaded = False
 
     def compose(self):
         with Static(id="disks_header_container"):
@@ -105,7 +106,7 @@ class DisksTab(Vertical):
         yield DataTable(id="disks_table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        """Setup table and start updates."""
+        """Setup table structure (no data loading)."""
         table = self.query_one(DataTable)
         table.add_columns(
             "Name",
@@ -122,7 +123,12 @@ class DisksTab(Vertical):
             "Mountpoint",
             "UUID",
         )
-        self.update_data()
+
+    def on_show(self) -> None:
+        """Load data when tab becomes visible."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self.update_data()
 
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:

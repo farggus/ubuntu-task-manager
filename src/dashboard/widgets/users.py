@@ -67,6 +67,7 @@ class UsersTab(Vertical):
         self._current_view = self.VIEW_ALL
         self._last_data = None
         self._user_color_map = {}
+        self._data_loaded = False
 
     def compose(self):
         with Static(id="users_header_container"):
@@ -74,9 +75,14 @@ class UsersTab(Vertical):
         yield DataTable(id="users_table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        """Setup table and start updates."""
+        """Setup table structure (no data loading)."""
         self._setup_table_columns()
-        self.update_data()
+
+    def on_show(self) -> None:
+        """Load data when tab becomes visible."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self.update_data()
 
     def _setup_table_columns(self) -> None:
         """Setup table columns based on current view mode."""

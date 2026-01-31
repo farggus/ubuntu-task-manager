@@ -112,6 +112,10 @@ class LoggingTab(Vertical):
         # Auto-scroll to new logs
         self.auto_scroll = True
 
+        # Lazy loading
+        self._data_loaded = False
+        self._log_timer: Optional[Timer] = None
+
     def compose(self) -> ComposeResult:
         with Horizontal(id="log_header_container"):
             yield Label("[bold cyan]Loading logs...[/bold cyan]", id="log_header")
@@ -129,11 +133,24 @@ class LoggingTab(Vertical):
         yield RichLog(id="log_view", highlight=True, markup=True)
 
     def on_mount(self) -> None:
-        """Initialize log view and start updates."""
+        """Initialize log view (no data loading)."""
         self._update_border_title()
-        self._update_header()
-        self.update_logs()
-        self.set_interval(1.0, self.update_logs)
+
+    def on_show(self) -> None:
+        """Load data and start timer when tab becomes visible."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self._update_header()
+            self.update_logs()
+        # Start log update timer
+        if self._log_timer is None:
+            self._log_timer = self.set_interval(1.0, self.update_logs)
+
+    def on_hide(self) -> None:
+        """Stop timer when tab is hidden."""
+        if self._log_timer is not None:
+            self._log_timer.stop()
+            self._log_timer = None
 
     def action_reset_filters(self) -> None:
         """Reset all filters to default (Show All)."""

@@ -53,6 +53,7 @@ class ServicesTab(Vertical):
     def __init__(self, collector: ServicesCollector):
         super().__init__()
         self.collector = collector
+        self._data_loaded = False
 
     def compose(self):
         # Header
@@ -62,15 +63,19 @@ class ServicesTab(Vertical):
         yield DataTable(id="services_table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        """Setup table and start updates."""
+        """Setup table structure (no data loading)."""
         table = self.query_one(DataTable)
         table.add_column("Service", width=30)
         table.add_column("User", width=15)
         table.add_column("State", width=15)
         table.add_column("SubState", width=15)
         table.add_column("Description")
-        
-        self.update_data()
+
+    def on_show(self) -> None:
+        """Load data when tab becomes visible."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self.update_data()
 
     def action_restart_service(self) -> None:
         self._manage_service("restart")

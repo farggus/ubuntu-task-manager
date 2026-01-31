@@ -63,6 +63,7 @@ class PackagesTab(Vertical):
         self.collector = collector
         self.show_all = False
         self.filter_char = None
+        self._data_loaded = False
 
     def compose(self):
         # Header with counts wrapped in a border
@@ -76,9 +77,15 @@ class PackagesTab(Vertical):
         yield Label("[dim]Type a-z to jump[/dim]", classes="help-text")
 
     def on_mount(self) -> None:
+        """Setup table structure (no data loading)."""
         table = self.query_one(DataTable)
         table.add_columns("Package", "Current Version", "New Version")
-        self.update_data()
+
+    def on_show(self) -> None:
+        """Load data when tab becomes visible."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self.update_data()
         
     def on_key(self, event) -> None:
         # Jump to letter logic

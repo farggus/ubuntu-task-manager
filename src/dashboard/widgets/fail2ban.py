@@ -112,6 +112,7 @@ class Fail2banTab(Vertical):
         self._current_tab: SubTab = SubTab.ACTIVE
         self._search_term: str = ""
         self._search_timer: Optional[Timer] = None
+        self._data_loaded = False
 
     def compose(self):
         with Horizontal(id="f2b_header_container"):
@@ -124,10 +125,15 @@ class Fail2banTab(Vertical):
         yield DataTable(id="f2b_table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        """Setup table and load initial data."""
+        """Setup table structure (no data loading)."""
         self._setup_table()
         self._update_tab_bar()
-        self.update_data()
+
+    def on_show(self) -> None:
+        """Load data when tab becomes visible."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self.update_data()
 
     def on_click(self, event) -> None:
         """Handle tab clicks."""

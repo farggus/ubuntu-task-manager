@@ -53,6 +53,7 @@ class TasksExtendedTab(Vertical):
         self.collector = collector
         self._show_cron = True  # True = Cron Jobs, False = Timers
         self._last_data = None
+        self._data_loaded = False
 
     def compose(self):
         with Static(id="tasks_header_container"):
@@ -60,9 +61,14 @@ class TasksExtendedTab(Vertical):
         yield DataTable(id="tasks_table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        """Setup table and start updates."""
+        """Setup table structure (no data loading)."""
         self._setup_table_columns()
-        self.update_data()
+
+    def on_show(self) -> None:
+        """Load data when tab becomes visible."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self.update_data()
 
     def _setup_table_columns(self) -> None:
         """Setup table columns based on current view mode."""
