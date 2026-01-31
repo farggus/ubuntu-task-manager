@@ -86,7 +86,7 @@ class UTMDashboard(App):
         Binding("minus", "decrease_interval", "-", show=False),
         # Global UI Toggles
         Binding("ctrl+s", "toggle_system_info", "Toggle System Info", show=False),
-        Binding("ctrl+r", "refresh", "Refresh All"),
+        Binding("ctrl+r", "refresh", "Refresh"),
         Binding("ctrl+e", "export_snapshot", "Export Snapshot JSON"),
         # Navigation (Hidden)
         Binding("1", "switch_tab('processes')", "Processes", show=False),
@@ -261,15 +261,24 @@ class UTMDashboard(App):
         system_info.display = not system_info.display
 
     def action_refresh(self) -> None:
-        for widget in self.query(Static):
-            if hasattr(widget, 'update_data'):
-                widget.update_data()
-        for widget in self.query(Vertical):
-             if hasattr(widget, 'update_data'):
-                widget.update_data()
-        for widget in self.query(Horizontal): # CompactSystemInfo
-             if hasattr(widget, 'update_data'):
-                widget.update_data()
+        """Refresh only CompactSystemInfo and the active tab."""
+        # Always refresh system info panel
+        try:
+            self.query_one(CompactSystemInfo).update_data()
+        except Exception:
+            pass
+
+        # Refresh only the active tab widget
+        try:
+            active_tab_id = self.query_one(TabbedContent).active
+            # Find the widget inside the active TabPane
+            active_pane = self.query_one(f"#--content-tab-{active_tab_id}")
+            for child in active_pane.children:
+                if hasattr(child, 'update_data'):
+                    child.update_data()
+                    break
+        except Exception as e:
+            logger.debug(f"Could not refresh active tab: {e}")
 
     def action_export_snapshot(self) -> None:
         """Export current state of all collectors to a JSON file."""

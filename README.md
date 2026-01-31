@@ -60,7 +60,7 @@ Displayed in 3 columns with live data:
 
 **Global:**
 - `Ctrl+Q` - Quit
-- `Ctrl+R` - Refresh all data
+- `Ctrl+R` - Refresh current tab
 - `Ctrl+S` - Toggle system info panel
 - `Ctrl+E` - Export snapshot to JSON
 

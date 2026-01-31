@@ -372,36 +372,43 @@ class TestActionRefresh(unittest.TestCase):
         with patch.object(UTMDashboard, '__init__', lambda x, y: None):
             self.app = UTMDashboard.__new__(UTMDashboard)
 
-    def test_calls_update_data_on_static_widgets(self):
-        """Should call update_data on Static widgets that have it."""
-        mock_widget = MagicMock()
-        mock_widget.update_data = MagicMock()
+    def test_refreshes_system_info_and_active_tab(self):
+        """Should refresh CompactSystemInfo and the active tab widget."""
+        mock_system_info = MagicMock()
+        mock_system_info.update_data = MagicMock()
 
-        self.app.query = MagicMock(return_value=[mock_widget])
+        mock_tab_widget = MagicMock()
+        mock_tab_widget.update_data = MagicMock()
 
-        # Mock query to return our widget for Static, empty for others
-        def mock_query(cls):
-            from textual.widgets import Static
-            if cls == Static:
-                return [mock_widget]
-            return []
+        mock_tabbed_content = MagicMock()
+        mock_tabbed_content.active = "processes"
 
-        self.app.query = mock_query
+        mock_active_pane = MagicMock()
+        mock_active_pane.children = [mock_tab_widget]
+
+        def mock_query_one(selector):
+            from dashboard.widgets.system_info import CompactSystemInfo
+            from textual.widgets import TabbedContent
+            if selector == CompactSystemInfo:
+                return mock_system_info
+            if selector == TabbedContent:
+                return mock_tabbed_content
+            if selector == "#--content-tab-processes":
+                return mock_active_pane
+            raise Exception(f"Unknown selector: {selector}")
+
+        self.app.query_one = mock_query_one
         self.app.action_refresh()
 
-        mock_widget.update_data.assert_called()
+        mock_system_info.update_data.assert_called()
+        mock_tab_widget.update_data.assert_called()
 
-    def test_skips_widgets_without_update_data(self):
-        """Should skip widgets that don't have update_data method."""
-        mock_widget = MagicMock(spec=[])  # No update_data
+    def test_handles_missing_widgets_gracefully(self):
+        """Should not raise if widgets are not found."""
+        def mock_query_one(selector):
+            raise Exception("Widget not found")
 
-        def mock_query(cls):
-            from textual.widgets import Static
-            if cls == Static:
-                return [mock_widget]
-            return []
-
-        self.app.query = mock_query
+        self.app.query_one = mock_query_one
         # Should not raise
         self.app.action_refresh()
 
