@@ -115,6 +115,7 @@ class LoggingTab(Vertical):
         # Lazy loading
         self._data_loaded = False
         self._log_timer: Optional[Timer] = None
+        self._full_load_complete = False  # True when all logs are loaded
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="log_header_container"):
@@ -140,8 +141,8 @@ class LoggingTab(Vertical):
         """Load data and start timer when tab becomes visible."""
         if not self._data_loaded:
             self._data_loaded = True
-            self._update_header()
-            self.update_logs()
+            self._show_quick_preview()  # Instant tail -50
+            self._load_full_logs_background()  # Full load in background
         # Start log update timer
         if self._log_timer is None:
             self._log_timer = self.set_interval(1.0, self.update_logs)
@@ -151,6 +152,92 @@ class LoggingTab(Vertical):
         if self._log_timer is not None:
             self._log_timer.stop()
             self._log_timer = None
+
+    def _show_quick_preview(self) -> None:
+        """Show last 50 lines instantly for quick feedback."""
+        if not os.path.exists(LOG_FILE):
+            return
+
+        try:
+            # Read last 50 lines using efficient tail-like approach
+            with open(LOG_FILE, "rb") as f:
+                # Seek to end and read backwards
+                f.seek(0, 2)  # End of file
+                file_size = f.tell()
+
+                if file_size == 0:
+                    return
+
+                # Read last ~64KB (should be enough for 50 lines)
+                read_size = min(file_size, 65536)
+                f.seek(file_size - read_size)
+                data = f.read().decode("utf-8", errors="replace")
+
+            lines = data.splitlines()[-50:]  # Last 50 lines
+
+            log_view = self.query_one("#log_view", RichLog)
+            log_view.clear()
+
+            for line in lines:
+                clean_line = line.rstrip()
+                if clean_line:
+                    level = self._parse_level(clean_line)
+                    styled = self._colorize_line(clean_line, level)
+                    log_view.write(styled)
+
+            # Update UI with preview indicator
+            self.shown_count = len(lines)
+            self.total_count = len(lines)
+            self._update_border_title()
+            self._update_header()
+
+            # Scroll to bottom
+            log_view.scroll_end(animate=False)
+
+        except Exception:
+            pass
+
+    @work(thread=True)
+    def _load_full_logs_background(self) -> None:
+        """Load all logs in background for full filtering and statistics."""
+        if not os.path.exists(LOG_FILE):
+            self._full_load_complete = True
+            return
+
+        try:
+            with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
+                all_lines = f.readlines()
+                self.last_size = f.tell()
+
+            # Clear and rebuild cache
+            self.all_logs.clear()
+            self.level_counts.clear()
+            self.known_modules.clear()
+
+            for line in all_lines:
+                clean_line = line.rstrip()
+                if clean_line:
+                    level = self._parse_level(clean_line)
+                    module = self._parse_module(clean_line)
+
+                    self.all_logs.append((clean_line, level, module))
+
+                    if level != "UNKNOWN":
+                        self.level_counts[level] += 1
+
+                    if module != "unknown":
+                        self.known_modules.add(module)
+
+            self._full_load_complete = True
+
+            # Refresh view with all logs
+            self.app.call_from_thread(self.refresh_log_view)
+            self.app.call_from_thread(self._update_header)
+            self.app.call_from_thread(self._update_module_select)
+            self.app.call_from_thread(self._update_border_title)
+
+        except Exception:
+            self._full_load_complete = True
 
     def action_reset_filters(self) -> None:
         """Reset all filters to default (Show All)."""
@@ -292,13 +379,18 @@ class LoggingTab(Vertical):
         if self.module_filter:
             module_text = f" [magenta]{self.module_filter}[/magenta]"
 
-        # Follow indicator
-        follow_text = " [green]●[/green]" if self.auto_scroll else " [dim]○[/dim]"
+        # Status indicator: loading (yellow blink) → follow on (green) / off (dim)
+        if not self._full_load_complete:
+            status_indicator = " [yellow blink]●[/yellow blink]"
+        elif self.auto_scroll:
+            status_indicator = " [green]●[/green]"
+        else:
+            status_indicator = " [dim]○[/dim]"
 
         # Format: "Logs │ [FILTER] module shown/total ●"
         log_view.border_title = (
             f"[bold]Logs[/bold] │ [{filter_style}]{filter_text}[/{filter_style}]"
-            f"{module_text} [dim]{self.shown_count}/{self.total_count}[/dim]{follow_text}"
+            f"{module_text} [dim]{self.shown_count}/{self.total_count}[/dim]{status_indicator}"
         )
 
     def _update_header(self) -> None:
