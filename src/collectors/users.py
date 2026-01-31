@@ -33,7 +33,7 @@ class UsersCollector(BaseCollector):
         sessions = []
         try:
             current_time = datetime.datetime.now().timestamp()
-            
+
             for user in psutil.users():
                 login_dt = datetime.datetime.fromtimestamp(user.started)
                 duration_seconds = current_time - user.started
@@ -50,7 +50,7 @@ class UsersCollector(BaseCollector):
                 })
         except Exception as e:
             self.errors.append(f"Error getting sessions: {e}")
-            
+
         return sessions
 
     def _get_all_users(self) -> List[Dict[str, Any]]:
@@ -64,10 +64,10 @@ class UsersCollector(BaseCollector):
                     u_type = 'human'
                 else:
                     u_type = 'system'
-                
+
                 # Exclude nobody/nologin only if strictly needed, but request said "System Users", so keep them.
                 # Just keeping 'nobody' as system.
-                
+
                 users.append({
                     'name': p.pw_name,
                     'uid': p.pw_uid,
@@ -79,5 +79,5 @@ class UsersCollector(BaseCollector):
                 })
         except Exception as e:
             self.errors.append(f"Error reading passwd: {e}")
-            
+
         return sorted(users, key=lambda x: x['name'])

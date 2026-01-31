@@ -91,10 +91,10 @@ class ServicesTab(Vertical):
         if table.cursor_row is None:
             self.notify("No service selected", severity="warning")
             return
-            
+
         try:
             row = table.get_row_at(table.cursor_row)
-            service_name = str(row[0]) 
+            service_name = str(row[0])
             self.notify(f"Initiating {action} for {service_name}...", severity="information")
             logger.info(f"User requested {action} for service: {service_name}")
             self.run_service_command(service_name, action)
@@ -114,7 +114,7 @@ class ServicesTab(Vertical):
         try:
             cmd = [SUDO, SYSTEMCTL, action, service_name]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
+
             if result.returncode == 0:
                 logger.info(f"Successfully {action}ed service: {service_name}")
                 self.app.call_from_thread(self.notify, f"Successfully {action}ed {service_name}", severity="information")
@@ -138,10 +138,10 @@ class ServicesTab(Vertical):
     def update_table(self, data: Dict[str, Any]) -> None:
         """Update table on main thread."""
         table = self.query_one(DataTable)
-        
+
         systemd_data = data.get('systemd', {})
         services = systemd_data.get('services', [])
-        
+
         # Sort logic
         def sort_key(s):
             state = s.get('state', '').lower()
@@ -153,7 +153,7 @@ class ServicesTab(Vertical):
             return (priority, s.get('name', '').lower())
 
         services.sort(key=sort_key)
-        
+
         def populate(t):
             for service in services[:500]:
                 name = service.get('name', 'N/A')
@@ -176,15 +176,15 @@ class ServicesTab(Vertical):
                 t.add_row(name, user, state_styled, sub_state, description)
 
         update_table_preserving_scroll(table, populate)
-        
+
         # Update Header
         total = systemd_data.get('total', 0)
         active = systemd_data.get('active', 0)
         running = systemd_data.get('running', 0)
         failed = systemd_data.get('failed', 0)
-        
+
         fail_color = "red" if failed > 0 else "green"
-        
+
         header_text = (
             f"[bold cyan]Total Services: {total}[/bold cyan] | "
             f"[bold blue]Active: {active}[/bold blue] | "

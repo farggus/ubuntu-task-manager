@@ -45,15 +45,15 @@ PATTERNS = {
 class Fail2banV2Collector(BaseCollector):
     """
     Fail2ban v2 collector with unified database integration.
-    
+
     Parses fail2ban logs directly and stores data in AttacksDatabase.
     Supports incremental parsing via log position tracking.
     """
-    
+
     def __init__(self, config: Dict[str, Any] = None, db: AttacksDatabase = None):
         """
         Initialize collector.
-        
+
         Args:
             config: Optional configuration dict
             db: Optional AttacksDatabase instance (creates new one if not provided)
@@ -62,22 +62,22 @@ class Fail2banV2Collector(BaseCollector):
         self._db = db or AttacksDatabase()
         self._last_parse_time: float = 0
         self._parse_interval: float = 60.0  # Minimum seconds between full parses
-    
+
     @property
     def db(self) -> AttacksDatabase:
         """Get database instance."""
         return self._db
-    
+
     def collect(self) -> Dict[str, Any]:
         """
         Collect fail2ban data by parsing logs.
-        
+
         Returns:
             Dictionary with collection results
         """
         t0 = time.time()
         logger.debug("Starting Fail2Ban v2 collection")
-        
+
         result = {
             'success': False,
             'bans_found': 0,
@@ -87,42 +87,42 @@ class Fail2banV2Collector(BaseCollector):
             'parse_time': 0,
             'logs_parsed': [],
         }
-        
+
         try:
             # Parse fail2ban logs
             stats = self._parse_fail2ban_logs()
-            
+
             result['bans_found'] = stats.get('bans', 0)
             result['unbans_found'] = stats.get('unbans', 0)
             result['attempts_found'] = stats.get('attempts', 0)
             result['new_ips'] = stats.get('new_ips', 0)
             result['logs_parsed'] = stats.get('logs_parsed', [])
             result['success'] = True
-            
+
             # Sync active bans with fail2ban-client (real-time state)
             sync_stats = self._sync_with_fail2ban()
             result['synced_active'] = sync_stats.get('synced', 0)
-            
+
             # Save database
             self._db.save()
-            
+
             result['parse_time'] = time.time() - t0
             logger.info(
                 f"Fail2Ban v2 collection completed: "
                 f"{result['bans_found']} bans, {result['unbans_found']} unbans, "
                 f"{result['attempts_found']} attempts, duration={result['parse_time']:.2f}s"
             )
-            
+
         except Exception as e:
             logger.error(f"Error in Fail2Ban v2 collection: {e}")
             result['error'] = str(e)
-        
+
         return result
-    
+
     def _parse_fail2ban_logs(self) -> Dict[str, int]:
         """
         Parse fail2ban log files (including rotated).
-        
+
         Returns:
             Dict with counts of parsed events
         """
@@ -133,13 +133,13 @@ class Fail2banV2Collector(BaseCollector):
             'new_ips': 0,
             'logs_parsed': [],
         }
-        
+
         # Get all fail2ban log files
         log_files = self._get_log_files()
         if not log_files:
             logger.warning("No fail2ban log files found")
             return stats
-        
+
         for log_file in log_files:
             try:
                 file_stats = self._parse_single_log(log_file)
@@ -150,19 +150,19 @@ class Fail2banV2Collector(BaseCollector):
                 stats['logs_parsed'].append(str(log_file))
             except Exception as e:
                 logger.error(f"Error parsing {log_file}: {e}")
-        
+
         return stats
-    
+
     def _get_log_files(self) -> List[Path]:
         """
         Get list of fail2ban log files, sorted oldest first.
-        
+
         Returns:
             List of Path objects for log files
         """
         log_pattern = str(FAIL2BAN_LOG) + "*"
         files = [Path(f) for f in glob.glob(log_pattern)]
-        
+
         # Sort: oldest first (rotated logs first, then current)
         # fail2ban.log.2.gz, fail2ban.log.1, fail2ban.log
         def sort_key(p: Path) -> Tuple[int, str]:
@@ -175,89 +175,89 @@ class Fail2banV2Collector(BaseCollector):
                 return (1, -num)  # Higher numbers first (older)
             except ValueError:
                 return (1, name)
-        
+
         return sorted(files, key=sort_key, reverse=True)
-    
+
     def _parse_single_log(self, log_path: Path) -> Dict[str, int]:
         """
         Parse a single log file.
-        
+
         Args:
             log_path: Path to log file
-            
+
         Returns:
             Dict with counts of parsed events
         """
         stats = {'bans': 0, 'unbans': 0, 'attempts': 0, 'new_ips': 0}
         log_key = str(log_path)
-        
+
         # Get last known position (extract from dict if present)
         pos_data = self._db.get_log_position(log_key)
         last_position = pos_data.get('position', 0) if pos_data else 0
         current_position = 0
-        
+
         # Open file (handle gzip)
         opener = gzip.open if log_path.suffix == '.gz' else open
-        
+
         try:
             with opener(log_path, 'rt', encoding='utf-8', errors='ignore') as f:
                 for line_num, line in enumerate(f, 1):
                     current_position = line_num
-                    
+
                     # Skip already processed lines (for current log only)
                     if not log_path.name.endswith('.gz') and line_num <= last_position:
                         continue
-                    
+
                     # Try to match patterns
                     event = self._parse_line(line)
                     if event:
                         self._process_event(event, stats)
-            
+
             # Update position for current log (not rotated)
             if not log_path.name.endswith('.gz'):
                 self._db.set_log_position(log_key, current_position)
-                
+
         except Exception as e:
             logger.error(f"Error reading {log_path}: {e}")
-        
+
         return stats
-    
+
     def _parse_line(self, line: str) -> Optional[Dict[str, Any]]:
         """
         Parse a single log line.
-        
+
         Args:
             line: Log line to parse
-            
+
         Returns:
             Dict with event data or None
         """
         line = line.strip()
         if not line:
             return None
-        
+
         # Try each pattern
         for event_type, pattern in PATTERNS.items():
             match = pattern.match(line)
             if match:
                 data = match.groupdict()
                 data['type'] = event_type
-                
+
                 # Parse timestamp
                 try:
                     dt = datetime.strptime(data['timestamp'], '%Y-%m-%d %H:%M:%S')
                     data['datetime'] = dt.replace(tzinfo=timezone.utc)
                 except ValueError:
                     data['datetime'] = None
-                
+
                 return data
-        
+
         return None
-    
+
     def _process_event(self, event: Dict[str, Any], stats: Dict[str, int]) -> None:
         """
         Process a parsed event and update database.
-        
+
         Args:
             event: Parsed event data
             stats: Stats dict to update
@@ -266,38 +266,38 @@ class Fail2banV2Collector(BaseCollector):
         jail = event.get('jail', 'unknown')
         event_type = event.get('type')
         timestamp = event.get('datetime')
-        
+
         if not ip:
             return
-        
+
         # Check if IP is new
         existing = self._db.get_ip(ip)
         if not existing:
             stats['new_ips'] += 1
-        
+
         if event_type == 'ban':
             # Get jail bantime (default 600s for unknown)
             duration = self._get_jail_bantime(jail)
             self._db.record_ban(ip, jail, duration=duration)
             stats['bans'] += 1
             logger.debug(f"Recorded ban: {ip} in {jail}")
-            
+
         elif event_type == 'unban':
             self._db.record_unban(ip, jail)
             stats['unbans'] += 1
             logger.debug(f"Recorded unban: {ip} from {jail}")
-            
+
         elif event_type == 'found':
             self._db.record_attempt(ip, jail)
             stats['attempts'] += 1
-    
+
     def _get_jail_bantime(self, jail: str) -> int:
         """
         Get bantime for a jail.
-        
+
         Args:
             jail: Jail name
-            
+
         Returns:
             Bantime in seconds
         """
@@ -309,18 +309,18 @@ class Fail2banV2Collector(BaseCollector):
             'traefik-botsearch': 86400,
         }
         return bantimes.get(jail, 600)  # Default 10 min
-    
+
     def get_summary(self) -> Dict[str, Any]:
         """
         Get summary of current database state.
-        
+
         Returns:
             Dict with database summary
         """
         stats = self._db.get_stats()
         active_bans = self._db.get_active_bans()
         top_threats = self._db.get_top_threats(limit=10)
-        
+
         return {
             'total_ips': stats.get('total_ips', 0),
             'total_attempts': stats.get('total_attempts', 0),
@@ -338,62 +338,62 @@ class Fail2banV2Collector(BaseCollector):
                 for ip, data in top_threats
             ],
         }
-    
+
     def parse_full(self, reset_positions: bool = False) -> Dict[str, int]:
         """
         Force full parse of all logs.
-        
+
         Args:
             reset_positions: If True, reset all log positions first
-            
+
         Returns:
             Dict with parse statistics
         """
         if reset_positions:
             # Clear log positions to force full re-parse
             self._db._data['metadata']['log_positions'] = {}
-        
+
         stats = self._parse_fail2ban_logs()
         self._db.recalculate_stats()
         self._db.save()
-        
+
         return stats
-    
+
     def _sync_with_fail2ban(self) -> Dict[str, int]:
         """
         Sync active bans with fail2ban-client (real-time state).
-        
+
         This corrects the 'active' flag in database based on actual
         fail2ban state, not just log events.
-        
+
         Returns:
             Dict with sync statistics
         """
         from collectors.fail2ban_client import Fail2banClient
-        
+
         stats = {'synced': 0, 'activated': 0, 'deactivated': 0}
-        
+
         try:
             client = Fail2banClient()
             if not client.is_running():
                 logger.warning("Fail2ban not running, skipping sync")
                 return stats
-            
+
             # Get all currently banned IPs from fail2ban
             banned_ips = client.get_all_banned_ips()  # {jail: [ips]}
             all_banned = set()
             for jail, ips in banned_ips.items():
                 all_banned.update(ips)
-            
+
             logger.debug(f"Syncing {len(all_banned)} active bans from fail2ban")
-            
+
             # Update database
             all_db_ips = self._db.get_all_ips()
             for ip, data in all_db_ips.items():
                 bans = data.get('bans', {})
                 is_active_in_db = bans.get('active', False)
                 is_active_real = ip in all_banned
-                
+
                 if is_active_in_db != is_active_real:
                     # Need to update
                     if is_active_real:
@@ -405,7 +405,7 @@ class Fail2banV2Collector(BaseCollector):
                         self._db._data['ips'][ip]['bans']['active'] = False
                         stats['deactivated'] += 1
                     stats['synced'] += 1
-            
+
             # Also add any banned IPs not in DB yet
             for ip in all_banned:
                 if ip not in all_db_ips:
@@ -413,12 +413,12 @@ class Fail2banV2Collector(BaseCollector):
                     self._db._data['ips'][ip]['bans']['active'] = True
                     stats['synced'] += 1
                     stats['activated'] += 1
-            
+
             self._db._dirty = True
             logger.info(f"Synced active bans: {stats['activated']} activated, {stats['deactivated']} deactivated")
-            
+
         except Exception as e:
             logger.error(f"Failed to sync with fail2ban: {e}")
-        
+
         return stats
 

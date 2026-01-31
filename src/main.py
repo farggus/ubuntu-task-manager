@@ -10,20 +10,20 @@ import os
 import sys
 from pathlib import Path
 
+import sentry_sdk
 from dotenv import load_dotenv
 
 # Ensure src is in python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from const import APP_NAME, APP_VERSION, DEFAULT_CONFIG, LOGGER_PREFIX, SLOW_BOTS_FILE
-from dashboard import UTMDashboard
-from utils.logger import setup_exception_logging, setup_logging
+from const import APP_NAME, APP_VERSION, DEFAULT_CONFIG, LOGGER_PREFIX, SLOW_BOTS_FILE  # noqa: E402
+from dashboard import UTMDashboard  # noqa: E402
+from utils.logger import setup_exception_logging, setup_logging  # noqa: E402
+
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize Sentry for error tracking
-import sentry_sdk
 
 if os.getenv("SENTRY_DSN"):
     sentry_sdk.init(
@@ -31,6 +31,7 @@ if os.getenv("SENTRY_DSN"):
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
     )
+
 
 def main():
     """Main entry point."""
@@ -66,7 +67,7 @@ def main():
     if not config_path.exists():
         print(f"Warning: Config file '{args.config}' not found. Using defaults.")
         logger.warning(f"Config file '{args.config}' not found. Using defaults.")
-        print(f"Create a config.yaml file from the example to customize settings.")
+        print("Create a config.yaml file from the example to customize settings.")
 
     try:
         logger.info(f"========== Starting {APP_NAME} ==========")

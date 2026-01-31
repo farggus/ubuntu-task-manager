@@ -200,7 +200,7 @@ class ProcessesTab(Vertical):
                 # Display running* for sleeping processes with CPU usage
                 status_display = status
                 status_style = "white"
-                
+
                 if status == psutil.STATUS_SLEEPING and p.get('cpu', 0.0) > 0.0:
                     status_display = "running*"
                     status_style = "bold green"
@@ -212,9 +212,9 @@ class ProcessesTab(Vertical):
                     status_style = "dim"
 
                 t.add_row(pid, name, user, Text(status_display, style=status_style), cpu, mem, ppid, cmd)
-        
+
         update_table_preserving_scroll(table, populate)
-        
+
         # Update Header
         stats = data.get('stats', {})
         total = stats.get('total', 0)
@@ -222,9 +222,9 @@ class ProcessesTab(Vertical):
         sleeping = stats.get('sleeping', 0)
         zombies = stats.get('zombies', 0)
         other = stats.get('other', 0)
-        
+
         zombie_color = "red" if zombies > 0 else "green"
-        
+
         header_text = (
             f"[bold cyan]Total: {total}[/bold cyan] | "
             f"[bold green]Running: {running}[/bold green] | "

@@ -6,11 +6,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from dashboard.app import UTMDashboard
+from dashboard.app import UTMDashboard  # noqa: E402
 
 
 class TestLoadConfig(unittest.TestCase):

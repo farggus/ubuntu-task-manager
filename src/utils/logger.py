@@ -12,18 +12,18 @@ from const import LOG_FILE, LOGGER_PREFIX
 def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
     """
     Configure application logging.
-    
+
     Args:
         log_file: Path to the log file.
         level: Logging level (default: logging.INFO).
     """
     logger = logging.getLogger(LOGGER_PREFIX)
     logger.setLevel(level)
-    
+
     # Check environment variables
     log_format = os.getenv('LOG_FORMAT', 'text').lower()
     log_dest = os.getenv('LOG_DEST', 'file').lower()
-    
+
     if log_dest == 'stdout':
         handler = logging.StreamHandler(sys.stdout)
     else:
@@ -33,7 +33,7 @@ def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
             backupCount=10,
             encoding='utf-8'
         )
-    
+
     # Import JsonFormatter if available and requested
     json_formatter = None
     if log_format == 'json':
@@ -53,13 +53,13 @@ def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
             '%(asctime)s - %(levelname)s - [%(name)s] - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
-    
+
     handler.setFormatter(formatter)
-    
+
     # Remove existing handlers to avoid duplicates
     if logger.hasHandlers():
         logger.handlers.clear()
-    
+
     logger.addHandler(handler)
     logger.propagate = False
 
@@ -76,7 +76,7 @@ def setup_exception_logging():
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
-        
+
         logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
     sys.excepthook = handle_exception

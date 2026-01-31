@@ -3,11 +3,11 @@
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from utils.ui_helpers import bytes_to_human_readable, update_table_preserving_scroll
+from utils.ui_helpers import bytes_to_human_readable, update_table_preserving_scroll  # noqa: E402
 
 
 class TestBytesToHumanReadable(unittest.TestCase):

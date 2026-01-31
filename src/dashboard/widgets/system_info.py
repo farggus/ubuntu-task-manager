@@ -128,13 +128,13 @@ class CompactSystemInfo(Horizontal):
         # Column 2: Resources
         with Vertical(classes="column-2"):
             yield Label("Resources History")
-            
+
             yield Label("CPU Load: N/A | Load Avg: N/A", id="cpu_label", classes="spark-label")
             yield Sparkline([], summary_function=max, id="cpu_spark")
 
             yield Label("CPU Frequency: N/A", id="freq_label", classes="spark-label")
             yield Sparkline([], summary_function=max, id="freq_spark")
-            
+
             # Memory and Swap
             with Horizontal(classes="ms-container"):
                 # Memory
@@ -143,7 +143,7 @@ class CompactSystemInfo(Horizontal):
                     with Horizontal(classes="spark-row"):
                         yield Sparkline([], summary_function=max, id="mem_spark")
                         yield Label("N/A%", id="mem_percent")
-                
+
                 # Swap
                 with Vertical(classes="res-group"):
                     yield Label("SWAP Usage", id="swap_header", classes="spark-label")
@@ -193,7 +193,7 @@ class CompactSystemInfo(Horizontal):
         """Update the refresh timer with new interval."""
         if hasattr(self, '_update_timer'):
             self._update_timer.stop()
-        
+
         # Convert ms to seconds for set_interval
         self._update_timer = self.set_interval(interval_ms / 1000, self.update_data)
         logger.debug(f"System info interval updated to {interval_ms}ms")
@@ -218,7 +218,7 @@ class CompactSystemInfo(Horizontal):
         self.border_subtitle = f"[dim]-[/dim] [bold cyan]{interval}[/bold cyan] [dim]+[/dim]"
 
         # 1. Update Sparklines and Labels
-        
+
         # CPU Load & Load Avg
         cpu_usage = data.get('cpu', {}).get('usage_total', 0)
         self.cpu_history.append(cpu_usage)
@@ -227,7 +227,7 @@ class CompactSystemInfo(Horizontal):
         cpu_text = Text()
         cpu_text.append("CPU Load ", style="bold cyan")
         cpu_text.append(f"{cpu_usage}%", style="bold white")
-        
+
         try:
             load_avg = os_module.getloadavg()
             load_str = f"{load_avg[0]:.2f}, {load_avg[1]:.2f}, {load_avg[2]:.2f}"
@@ -236,7 +236,7 @@ class CompactSystemInfo(Horizontal):
             cpu_text.append(load_str, style="bold yellow")
         except Exception as e:
             logger.debug(f"Failed to get load average: {e}")
-            
+
         self.query_one("#cpu_label", Label).update(cpu_text)
 
         # Frequency
@@ -244,7 +244,7 @@ class CompactSystemInfo(Horizontal):
         current_freq = cpu_freq.get('current', 0)
         self.freq_history.append(current_freq)
         self.query_one("#freq_spark", Sparkline).data = list(self.freq_history)
-        
+
         freq_text = Text()
         freq_text.append("CPU Frequency ", style="bold cyan")
         freq_text.append(f"{current_freq:.0f} MHz", style="bold white")
@@ -256,15 +256,15 @@ class CompactSystemInfo(Horizontal):
             mem_percent = mem_info.get('percent', 0)
             mem_used_gb = mem_info.get('used', 0) / (1024**3)
             mem_total_gb = mem_info.get('total', 0) / (1024**3)
-            
+
             self.mem_history.append(mem_percent)
             self.query_one("#mem_spark", Sparkline).data = list(self.mem_history)
-            
+
             mem_text = Text()
             mem_text.append("RAM Usage ", style="bold cyan")
             mem_text.append(f"[{mem_used_gb:.1f}GB of {mem_total_gb:.1f}GB]", style="dim white")
             self.query_one("#mem_header", Label).update(mem_text)
-            
+
             p_style = "green"
             if mem_percent > 80: p_style = "red"
             elif mem_percent > 60: p_style = "yellow"
@@ -278,15 +278,15 @@ class CompactSystemInfo(Horizontal):
             swap_percent = swap_info.get('percent', 0)
             swap_used_gb = swap_info.get('used', 0) / (1024**3)
             swap_total_gb = swap_info.get('total', 0) / (1024**3)
-            
+
             self.swap_history.append(swap_percent)
             self.query_one("#swap_spark", Sparkline).data = list(self.swap_history)
-            
+
             swap_text = Text()
             swap_text.append("SWAP Usage ", style="bold cyan")
             swap_text.append(f"[{swap_used_gb:.1f}GB of {swap_total_gb:.1f}GB]", style="dim white")
             self.query_one("#swap_header", Label).update(swap_text)
-            
+
             p_style = "green"
             if swap_percent > 50: p_style = "red"
             elif swap_percent > 20: p_style = "yellow"
@@ -313,7 +313,7 @@ class CompactSystemInfo(Horizontal):
         days, remainder = divmod(seconds, 86400)
         hours, remainder = divmod(remainder, 3600)
         minutes, seconds = divmod(remainder, 60)
-        
+
         parts = []
         if days > 0: parts.append(f"{days}d")
         if hours > 0: parts.append(f"{hours}h")
@@ -336,14 +336,14 @@ class CompactSystemInfo(Horizontal):
 
         table.add_row("Hostname", Text(hostname, style="bold cyan"))
         table.add_row("IP Address", Text(network_info.get('ip', 'N/A'), style="green"))
-        
+
         # Display Kernel release
         table.add_row("Kernel", os_info.get('release', 'N/A'))
-        
+
         # Formatted Uptime
         uptime_secs = uptime_info.get('uptime_seconds', 0)
         table.add_row("Uptime", self._format_uptime(uptime_secs))
-        
+
         cpu_cores = f"{cpu_info.get('physical_cores', 0)}/{cpu_info.get('total_cores', 0)}"
         table.add_row("Cores (P/T)", cpu_cores)
 
@@ -355,11 +355,11 @@ class CompactSystemInfo(Horizontal):
         # Users
         users_count = data.get('users', 0)
         table.add_row("Users logged in", str(users_count))
-        
+
         # Processes
         total_procs = processes_info.get('total', 0)
         zombies = processes_info.get('zombies', 0)
-        
+
         proc_text = Text(f"{total_procs}", style="white")
         if zombies > 0:
             proc_text.append(f" ({zombies} zombies)", style="bold red")
@@ -369,7 +369,7 @@ class CompactSystemInfo(Horizontal):
         services_stats = data.get('services_stats', {})
         active_svc = services_stats.get('active', 0)
         failed_svc = services_stats.get('failed', 0)
-        
+
         svc_text = Text(f"{active_svc}", style="white")
         if failed_svc > 0:
             svc_text.append(f" ({failed_svc} failed)", style="bold red")
@@ -379,7 +379,7 @@ class CompactSystemInfo(Horizontal):
         pkg_stats = data.get('packages', {})
         pkg_total = pkg_stats.get('total', 0)
         pkg_upd = pkg_stats.get('updates', 0)
-        
+
         pkg_text = Text(f"{pkg_total}", style="white")
         if pkg_upd > 0:
             pkg_text.append(f" ({pkg_upd} updates available)", style="bold red")
@@ -391,18 +391,18 @@ class CompactSystemInfo(Horizontal):
         """Render disk usage information."""
         disk_info = data.get('disk', {})
         partitions = disk_info.get('partitions', [])
-        
+
         # Priority partitions
         priority_mounts = ['/', '/boot', '/boot/efi', '/home']
         main_partitions = []
-        
+
         # Filter and sort by priority
         for mount in priority_mounts:
             for p in partitions:
                 if p.get('mountpoint') == mount:
                     main_partitions.append(p)
-                    break 
-        
+                    break
+
         # Table for main partitions
         table = Table(show_header=True, box=None, padding=(0, 1), expand=True)
         table.add_column("Mount", style="cyan")
@@ -415,11 +415,11 @@ class CompactSystemInfo(Horizontal):
             total = p.get('total', 0) / (1024**3)
             used = p.get('used', 0) / (1024**3)
             percent = p.get('percent', 0)
-            
+
             style = "green"
             if percent > 90: style = "red"
             elif percent > 75: style = "yellow"
-            
+
             table.add_row(
                 mount,
                 f"{used:.1f}G",

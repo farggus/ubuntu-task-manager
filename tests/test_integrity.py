@@ -1,10 +1,11 @@
-import unittest
-import sys
-import os
 import importlib
+import os
+import sys
+import unittest
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 class TestAppIntegrity(unittest.TestCase):
     def test_dashboard_import(self):
@@ -33,12 +34,17 @@ class TestAppIntegrity(unittest.TestCase):
     def test_collectors_import(self):
         """Ensure all collectors are exposed correctly."""
         try:
-            from collectors import (
-                SystemCollector, ServicesCollector, NetworkCollector, 
-                TasksCollector, UsersCollector, ProcessesCollector
+            from collectors import (  # noqa: F401
+                NetworkCollector,
+                ProcessesCollector,
+                ServicesCollector,
+                SystemCollector,
+                TasksCollector,
+                UsersCollector,
             )
         except Exception as e:
             self.fail(f"Collectors package structure is broken: {e}")
+
 
 if __name__ == '__main__':
     unittest.main()

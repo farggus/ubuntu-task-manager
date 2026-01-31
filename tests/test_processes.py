@@ -1,7 +1,6 @@
 """Tests for ProcessesCollector."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 class TestProcessesCollector:
@@ -208,7 +207,7 @@ class TestProcessParentInfo:
             'status': psutil.STATUS_RUNNING,
             'cpu_percent': 1.0,
             'memory_percent': 0.5,
-            'memory_info': MagicMock(rss=1024*1024),
+            'memory_info': MagicMock(rss=1024 * 1024),
             'create_time': datetime.now().timestamp(),
             'cmdline': ['test', 'cmd'],
             'ppid': 1  # Parent PID not in list

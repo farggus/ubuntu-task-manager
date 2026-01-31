@@ -61,7 +61,7 @@ class ContainerLogModal(ModalScreen):
         if not docker:
             self.query_one(RichLog).write("[bold red]Docker SDK not installed.[/bold red]")
             return
-            
+
         self._log_thread = threading.Thread(
             target=self.stream_logs_thread,
             daemon=True # This is the crucial part
@@ -74,7 +74,7 @@ class ContainerLogModal(ModalScreen):
         try:
             client = docker.from_env()
             container = client.containers.get(self.container_id)
-            
+
             # Initial logs
             log_content = container.logs(tail=200).decode('utf-8', errors='ignore')
             initial_logs_list = log_content.strip().splitlines()[-50:]
@@ -92,7 +92,7 @@ class ContainerLogModal(ModalScreen):
                     break
                 decoded_line = line.decode('utf-8', errors='ignore').strip()
                 self.app.call_from_thread(log_view.write, escape(decoded_line))
-        
+
         except NotFound:
             logger.warning(f"Container {self.container_id} not found")
             self.app.call_from_thread(log_view.write, f"[bold red]Error: Container {self.container_id} not found.[/bold red]")

@@ -201,16 +201,18 @@ class UTMDashboard(App):
         if path.exists():
             with open(path, 'r') as f:
                 config = yaml.safe_load(f) or {}
-        
+
         # Environment variable overrides
         # Docker settings
         if os_module.getenv('UTM_DOCKER_ENABLED'):
-            if 'docker' not in config: config['docker'] = {}
+            if 'docker' not in config:
+                config['docker'] = {}
             config['docker']['enabled'] = os_module.getenv('UTM_DOCKER_ENABLED').lower() == 'true'
-            
+
         if os_module.getenv('UTM_DOCKER_SOCKET'):
-             if 'docker' not in config: config['docker'] = {}
-             config['docker']['socket'] = os_module.getenv('UTM_DOCKER_SOCKET')
+            if 'docker' not in config:
+                config['docker'] = {}
+            config['docker']['socket'] = os_module.getenv('UTM_DOCKER_SOCKET')
 
         return config
 
@@ -218,7 +220,7 @@ class UTMDashboard(App):
         yield Header()
         with Container(classes="main-container"):
             yield CompactSystemInfo(self.system_collector)
-            
+
             with TabbedContent(initial="processes"):
                 with TabPane("[b green]1[/] Processes", id="processes"):
                     yield ProcessesTab(self.processes_collector)
@@ -252,7 +254,7 @@ class UTMDashboard(App):
 
                 with TabPane("[b green]0[/] Logging", id="logging"):
                     yield LoggingTab()
-        
+
         yield Footer()
 
     def action_toggle_system_info(self) -> None:

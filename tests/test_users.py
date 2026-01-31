@@ -1,7 +1,6 @@
 """Tests for UsersCollector."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestUsersCollector:

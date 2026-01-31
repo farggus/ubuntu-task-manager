@@ -105,7 +105,7 @@ class ContainersTab(Vertical):
 
     def action_start_container(self):
         self._manage_container("start")
-    
+
     def action_stop_container(self):
         self._manage_container("stop")
 
@@ -118,7 +118,7 @@ class ContainersTab(Vertical):
         if table.cursor_row is None:
             self.notify("No container selected.", severity="warning")
             return
-        
+
         try:
             row = table.get_row_at(table.cursor_row)
             container_id = str(row[0])
@@ -132,12 +132,12 @@ class ContainersTab(Vertical):
         if not docker:
             self.notify("Docker library not installed.", severity="error")
             return
-            
+
         table = self.query_one(DataTable)
         if table.cursor_row is None:
             self.notify("No container selected.", severity="warning")
             return
-        
+
         try:
             row = table.get_row_at(table.cursor_row)
             container_id = str(row[0])
@@ -152,14 +152,14 @@ class ContainersTab(Vertical):
         try:
             client = docker.from_env()
             container = client.containers.get(container_id)
-            
+
             if action == 'start':
                 container.start()
             elif action == 'stop':
                 container.stop()
             elif action == 'restart':
                 container.restart()
-            
+
             msg = f"Container {container_id} {action}ed successfully."
             logger.info(msg)
             self.app.call_from_thread(self.notify, msg, severity="information")

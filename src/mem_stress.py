@@ -16,7 +16,7 @@ try:
         if i % 10 == 0:
             print(f"Allocated {(i+1)*100} MB")
             sys.stdout.flush()
-    
+
     print("Done. Holding...")
     time.sleep(300)
 except MemoryError:

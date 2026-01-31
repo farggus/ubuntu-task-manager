@@ -60,7 +60,7 @@ class LoggingTab(Vertical):
         background: transparent;
         color: $text;
     }
-    
+
     .log-file-label {
         margin-left: 2;
         width: 1fr;
@@ -491,7 +491,7 @@ class LoggingTab(Vertical):
             "ERROR": "red",
             "CRITICAL": "bold red",
         }
-        
+
         # Special case for startup message
         if "========== Starting Ubuntu Task Manager ==========" in line:
             color = "white"
