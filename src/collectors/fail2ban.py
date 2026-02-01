@@ -138,7 +138,7 @@ class Fail2banCollector(BaseCollector):
                 text=True,
                 timeout=10
             )
-            logger.debug(f"fail2ban-client status executed in {time.time()-t1:.3f}s")
+            logger.debug(f"fail2ban-client status executed in {time.time() - t1:.3f}s")
 
             if status_result.returncode != 0:
                 return result
@@ -185,7 +185,7 @@ class Fail2banCollector(BaseCollector):
 
             t4 = time.time()
             slow_bots_jail = self._get_slow_bots_from_cache(exclude_ips=active_ips)
-            logger.debug(f"Loaded slow bots cache in {time.time()-t4:.3f}s")
+            logger.debug(f"Loaded slow bots cache in {time.time() - t4:.3f}s")
             if slow_bots_jail:
                 result['jails'].append(slow_bots_jail)
 
@@ -638,9 +638,9 @@ class Fail2banCollector(BaseCollector):
                     timeout=5,
                     capture_output=True
                 )
-                logger.debug(f"Set bantime completed in {time.time()-t1:.3f}s, returncode={result.returncode}")
+                logger.debug(f"Set bantime completed in {time.time() - t1:.3f}s, returncode={result.returncode}")
 
-            logger.debug(f"Executing banip command")
+            logger.debug("Executing banip command")
             t2 = time.time()
             result = subprocess.run(
                 [FAIL2BAN_CLIENT, 'set', jail, 'banip', ip],
@@ -648,8 +648,8 @@ class Fail2banCollector(BaseCollector):
                 timeout=5,
                 capture_output=True
             )
-            logger.debug(f"Ban command executed in {time.time()-t2:.3f}s, returncode={result.returncode}")
-            logger.info(f"Successfully banned IP {ip} in {time.time()-t0:.2f}s")
+            logger.debug(f"Ban command executed in {time.time() - t2:.3f}s, returncode={result.returncode}")
+            logger.info(f"Successfully banned IP {ip} in {time.time() - t0:.2f}s")
             return True
         except Exception as e:
             logger.error(f"Failed to ban IP {ip}: {e}")

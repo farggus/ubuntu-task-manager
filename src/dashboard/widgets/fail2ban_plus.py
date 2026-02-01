@@ -7,7 +7,7 @@ Uses hybrid data sources:
 """
 
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Optional
 
 from textual import work
 from textual.app import ComposeResult

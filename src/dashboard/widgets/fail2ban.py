@@ -3,7 +3,7 @@
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from rich.text import Text
 from textual import on, work
@@ -11,20 +11,18 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.coordinate import Coordinate
 from textual.timer import Timer
-from textual.widgets import DataTable, Input, Label, Static
+from textual.widgets import DataTable, Input, Label
 
 from collectors import Fail2banCollector
 from dashboard.widgets.analysis_modal import AnalysisModal
 from dashboard.widgets.confirm_modal import ConfirmModal
 from dashboard.widgets.whitelist_modal import WhitelistModal
-from models.fail2ban import JailType
 from utils.formatters import (
     format_attempts,
     format_banned_count,
     format_bantime,
     format_jail_status,
     format_org,
-    format_status,
 )
 from utils.logger import get_logger
 from utils.ui_helpers import update_table_preserving_scroll
@@ -255,7 +253,6 @@ class Fail2banTab(Vertical):
 
     def action_ban_ip(self) -> None:
         """Show confirmation and ban selected IP."""
-        t0 = time.time()
         logger.info("Manual ban action triggered")
 
         ip, jail = self._get_selected_ip_info()
@@ -300,16 +297,13 @@ class Fail2banTab(Vertical):
             # Remove from original jail if it was a temporary ban
             if jail and jail not in ('recidive', *VIRTUAL_JAILS):
                 logger.debug(f"Cleaning up from original jail: {jail}")
-                t2 = time.time()
                 if self.collector.unban_ip(ip, jail=jail):
-                    logger.debug(f"Cleanup completed in {time.time()-t2:.3f}s")
+                    logger.debug("Cleanup completed")
 
             # Refresh to show updated state
             logger.debug("Scheduling update_data()")
-            t3 = time.time()
             self.update_data()
-            logger.debug(f"update_data() scheduled in {time.time()-t3:.3f}s")
-            logger.info(f"Ban operation completed for IP {ip} in {time.time()-t0:.2f}s")
+            logger.info(f"Ban operation completed for IP {ip}")
         else:
             self._notify_error(f"Failed to ban {ip}")
             logger.warning(f"Ban operation failed for IP {ip}")
@@ -499,7 +493,7 @@ class Fail2banTab(Vertical):
             self._last_data = {'fail2ban': f2b_data}
             self._last_update = datetime.now()
             self.app.call_from_thread(self._update_view)
-            logger.debug(f"Fail2Ban data update completed in {time.time()-t0:.2f}s")
+            logger.debug(f"Fail2Ban data update completed in {time.time() - t0:.2f}s")
         except Exception as e:
             logger.error(f"Failed to update fail2ban data: {e}", exc_info=True)
 
@@ -558,7 +552,7 @@ class Fail2banTab(Vertical):
             active_jails = sum(1 for j in jails if j.get('currently_banned', 0) > 0)
             line2 = f"[cyan]Active:[/cyan] {active_jails}/{len(jails)} jails with bans"
         elif self._current_tab == SubTab.HISTORY:
-            line2 = f"[blue]History:[/blue] Recently unbanned IPs from all jails"
+            line2 = "[blue]History:[/blue] Recently unbanned IPs from all jails"
         elif self._current_tab == SubTab.SLOW:
             excluded = slow_jail.get('excluded_count', 0) if slow_jail else 0
             excluded_text = f" ({excluded} already banned)" if excluded else ""

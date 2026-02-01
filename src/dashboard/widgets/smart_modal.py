@@ -1,7 +1,6 @@
 """Modal screen for displaying SMART report."""
 
 import os
-import shlex
 import subprocess
 
 from rich.markup import escape
@@ -48,7 +47,7 @@ class SmartModal(ModalScreen):
     def compose(self):
         with Vertical(id="smart_modal_container"):
             yield Static(f"SMART Report for [b]{self.report_name}[/b]")
-            yield RichLog(id="smart_report_view", wrap=True, highlight=False, markup=False) # No markup for raw smartctl
+            yield RichLog(id="smart_report_view", wrap=True, highlight=False, markup=False)  # No markup
             yield Static("[dim]Press Esc to close[/dim]", id="modal_hint")
 
     def on_mount(self) -> None:

@@ -1,14 +1,13 @@
 """Packages tab widget."""
 
-import string
 import subprocess
 from typing import Any, Dict
 
 from rich.text import Text
 from textual import work
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Button, DataTable, Label, Static
+from textual.containers import Vertical
+from textual.widgets import DataTable, Label, Static
 
 from collectors import SystemCollector
 from utils.binaries import APT_GET, SUDO
@@ -181,9 +180,9 @@ class PackagesTab(Vertical):
             count_shown = 0
             if not source_list:
                 if not self.show_all and pkg_stats.get('updates', 0) == 0:
-                     t.add_row("System is up to date", "", "")
+                    t.add_row("System is up to date", "", "")
                 else:
-                     t.add_row("No packages found", "", "")
+                    t.add_row("No packages found", "", "")
             else:
                 for pkg in source_list[:2000]:
                     name = pkg.get('name', 'N/A')
@@ -191,11 +190,11 @@ class PackagesTab(Vertical):
                     new = pkg.get('new_version', '-')
 
                     if pkg.get('upgradable', False) or (not self.show_all):
-                         name_styled = Text(name, style="bold yellow")
-                         new_styled = Text(new, style="bold green")
+                        name_styled = Text(name, style="bold yellow")
+                        new_styled = Text(new, style="bold green")
                     else:
-                         name_styled = Text(name)
-                         new_styled = Text(new, style="dim")
+                        name_styled = Text(name)
+                        new_styled = Text(new, style="dim")
 
                     t.add_row(name_styled, curr, new_styled)
                     count_shown += 1

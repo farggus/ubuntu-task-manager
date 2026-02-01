@@ -7,6 +7,7 @@ from collectors.services import ServicesCollector
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 def debug():
     print("Initializing ServicesCollector...")
     # Emulate config as in config.yaml
@@ -35,6 +36,7 @@ def debug():
     else:
         for c in docker_data['containers']:
             print(f"- {c['name']} ({c['status']}) IP: {c.get('ip_address')}")
+
 
 if __name__ == "__main__":
     try:

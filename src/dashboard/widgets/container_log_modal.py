@@ -64,7 +64,7 @@ class ContainerLogModal(ModalScreen):
 
         self._log_thread = threading.Thread(
             target=self.stream_logs_thread,
-            daemon=True # This is the crucial part
+            daemon=True  # This is the crucial part
         )
         self._log_thread.start()
 
@@ -104,5 +104,5 @@ class ContainerLogModal(ModalScreen):
     def on_key(self, event) -> None:
         """Handle key presses."""
         if event.key == "escape":
-            self._stop_event.set() # Signal the thread to stop
+            self._stop_event.set()  # Signal the thread to stop
             self.dismiss()

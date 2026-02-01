@@ -2,7 +2,7 @@
 
 import os
 import signal
-from typing import Any, Dict
+from typing import Any  # noqa: F401
 
 from rich.text import Text
 from textual import work

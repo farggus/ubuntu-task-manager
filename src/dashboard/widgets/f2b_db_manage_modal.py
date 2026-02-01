@@ -6,7 +6,6 @@ parsing controls, statistics, and data table view.
 """
 
 import time
-from pathlib import Path
 from typing import Optional
 
 from textual import on, work
@@ -14,7 +13,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, Label, Static
+from textual.widgets import Button, DataTable, Label
 
 from collectors.fail2ban_v2 import Fail2banV2Collector
 from database.attacks_db import AttacksDatabase

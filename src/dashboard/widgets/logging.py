@@ -12,7 +12,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.timer import Timer
-from textual.widgets import Input, Label, RichLog, Select, Static
+from textual.widgets import Input, Label, RichLog, Select
 
 from const import LOG_DIR, LOG_FILE
 

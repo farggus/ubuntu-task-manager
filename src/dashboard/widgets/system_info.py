@@ -17,6 +17,7 @@ from utils.logger import get_logger
 
 logger = get_logger("system_info")
 
+
 class CompactSystemInfo(Horizontal):
     """Enhanced system information widget with 3 column layout."""
 
@@ -266,8 +267,10 @@ class CompactSystemInfo(Horizontal):
             self.query_one("#mem_header", Label).update(mem_text)
 
             p_style = "green"
-            if mem_percent > 80: p_style = "red"
-            elif mem_percent > 60: p_style = "yellow"
+            if mem_percent > 80:
+                p_style = "red"
+            elif mem_percent > 60:
+                p_style = "yellow"
             self.query_one("#mem_percent", Label).update(Text(f"{mem_percent}%", style=f"bold {p_style}"))
         except Exception as e:
             logger.debug(f"Failed to update memory info: {e}")
@@ -288,8 +291,10 @@ class CompactSystemInfo(Horizontal):
             self.query_one("#swap_header", Label).update(swap_text)
 
             p_style = "green"
-            if swap_percent > 50: p_style = "red"
-            elif swap_percent > 20: p_style = "yellow"
+            if swap_percent > 50:
+                p_style = "red"
+            elif swap_percent > 20:
+                p_style = "yellow"
             self.query_one("#swap_percent", Label).update(Text(f"{swap_percent}%", style=f"bold {p_style}"))
         except Exception as e:
             logger.debug(f"Failed to update swap info: {e}")
@@ -315,9 +320,12 @@ class CompactSystemInfo(Horizontal):
         minutes, seconds = divmod(remainder, 60)
 
         parts = []
-        if days > 0: parts.append(f"{days}d")
-        if hours > 0: parts.append(f"{hours}h")
-        if minutes > 0: parts.append(f"{minutes}m")
+        if days > 0:
+            parts.append(f"{days}d")
+        if hours > 0:
+            parts.append(f"{hours}h")
+        if minutes > 0:
+            parts.append(f"{minutes}m")
         return " ".join(parts) if parts else "< 1m"
 
     def _render_basic_info(self, data: Dict[str, Any]) -> Table:
@@ -417,8 +425,10 @@ class CompactSystemInfo(Horizontal):
             percent = p.get('percent', 0)
 
             style = "green"
-            if percent > 90: style = "red"
-            elif percent > 75: style = "yellow"
+            if percent > 90:
+                style = "red"
+            elif percent > 75:
+                style = "yellow"
 
             table.add_row(
                 mount,

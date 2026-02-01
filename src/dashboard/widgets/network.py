@@ -1,17 +1,12 @@
 """Network tab widget."""
 
-import time
-from typing import Any, Dict
-
 from rich.text import Text
 from textual import work
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Label, Static
 
 from collectors import NetworkCollector
-from dashboard.widgets.analysis_modal import AnalysisModal
 from utils.logger import get_logger
 from utils.ui_helpers import update_table_preserving_scroll
 
@@ -203,11 +198,6 @@ class NetworkExtendedTab(Vertical):
         ports_count = len(valid_ports)
         active_conns = sum(p.get('connections', 0) for p in valid_ports)
 
-        # Firewall stats
-        fw = data.get('firewall', {})
-        fw_type = fw.get('type', 'none') if fw else 'none'
-        fw_status = fw.get('status', 'unknown') if fw else 'N/A'
-
         # IPtables stats
         iptables_data = data.get('iptables', [])
         ipt_count = len(iptables_data) if isinstance(iptables_data, list) else 0
@@ -217,16 +207,6 @@ class NetworkExtendedTab(Vertical):
         nft_count = 0
         if isinstance(nft_data, dict) and 'nftables' in nft_data:
             nft_count = sum(1 for item in nft_data['nftables'] if 'rule' in item)
-
-        # Firewall status color
-        if fw_status in ['active', 'running', 'configured']:
-            fw_status_str = f"[green]{fw_type}[/green] [dim]({fw_status})[/dim]"
-        elif fw_status == 'inactive':
-            fw_status_str = f"[yellow]{fw_type}[/yellow] [dim]({fw_status})[/dim]"
-        elif fw_type == 'none':
-            fw_status_str = "[dim]none[/dim]"
-        else:
-            fw_status_str = f"[red]{fw_type}[/red] [dim]({fw_status})[/dim]"
 
         # Current view indicator
         view_labels = {
@@ -433,7 +413,7 @@ class NetworkExtendedTab(Vertical):
                 # Add separator/header for new chain
                 if chain != last_chain:
                     if last_chain is not None:
-                         t.add_row("", "", "", "", "", "", "")
+                        t.add_row("", "", "", "", "", "", "")
 
                     chain_text = Text(chain, style="bold cyan")
                     if policy:
@@ -570,13 +550,13 @@ class NetworkExtendedTab(Vertical):
                                     field = left['meta'].get('key', '')
 
                                 desc_parts.append(f"{field} {op} {right}")
-                            except:
+                            except Exception:
                                 desc_parts.append("match(...)")
                         elif key == 'counter':
                             pass  # Skip counters
                         else:
-                             # Convert complex dict to string representation for other keys
-                             desc_parts.append(key)
+                            # Convert complex dict to string representation for other keys
+                            desc_parts.append(key)
 
                     rule_text = ", ".join(desc_parts)
                     if not rule_text:

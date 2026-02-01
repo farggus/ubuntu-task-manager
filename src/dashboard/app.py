@@ -3,23 +3,17 @@
 import json
 import os as os_module
 import platform
-import subprocess
-from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import yaml
-from rich.console import Group
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, ScrollableContainer, Vertical
+from textual.containers import Container
 from textual.reactive import reactive
-from textual.widgets import DataTable, Footer, Header, Label, Sparkline, Static, TabbedContent, TabPane
+from textual.widgets import Footer, Header, TabbedContent, TabPane
 
 from collectors import (
     Fail2banCollector,

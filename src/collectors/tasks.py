@@ -1,7 +1,6 @@
 """Tasks and scheduled jobs collector with comprehensive cron parsing."""
 
 import os
-import shlex
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -83,7 +82,6 @@ class TasksCollector(BaseCollector):
                     parts = line.strip().split(':')
                     if len(parts) >= 3:
                         username = parts[0]
-                        uid = int(parts[2])
 
                         # Try to get crontab for this user
                         user_cron = self._get_user_crontab_for_user(username)
@@ -110,7 +108,6 @@ class TasksCollector(BaseCollector):
             if result.returncode == 0 and result.stdout.strip():
                 jobs = []
                 for line_num, line in enumerate(result.stdout.splitlines(), 1):
-                    original_line = line
                     line = line.strip()
 
                     # Skip comments and empty lines
@@ -148,7 +145,6 @@ class TasksCollector(BaseCollector):
                 jobs = []
                 with open(crontab_path, 'r') as f:
                     for line_num, line in enumerate(f, 1):
-                        original_line = line
                         line = line.strip()
 
                         if not line or line.startswith('#'):
@@ -188,7 +184,6 @@ class TasksCollector(BaseCollector):
                         try:
                             with open(cron_file, 'r') as f:
                                 for line_num, line in enumerate(f, 1):
-                                    original_line = line
                                     line = line.strip()
 
                                     if not line or line.startswith('#'):

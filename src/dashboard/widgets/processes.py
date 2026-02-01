@@ -143,7 +143,7 @@ class ProcessesTab(Vertical):
 
         try:
             row = table.get_row_at(table.cursor_row)
-            ppid_str = str(row[6]) # Parent PID is 7th column
+            ppid_str = str(row[6])  # Parent PID is 7th column
             if ppid_str and ppid_str.isdigit():
                 ppid = int(ppid_str)
                 os.kill(ppid, sig)

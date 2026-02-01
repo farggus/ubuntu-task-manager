@@ -652,4 +652,3 @@ class AttacksDatabase:
                 "last_line": last_line
             }
             self._dirty = True
-

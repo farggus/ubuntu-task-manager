@@ -3,7 +3,6 @@
 import logging
 import os
 import sys
-import traceback
 from logging.handlers import RotatingFileHandler
 
 from const import LOG_FILE, LOGGER_PREFIX
@@ -63,6 +62,7 @@ def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
     logger.addHandler(handler)
     logger.propagate = False
 
+
 def setup_exception_logging():
     """
     Set up a global exception hook to log uncaught exceptions.
@@ -81,8 +81,7 @@ def setup_exception_logging():
 
     sys.excepthook = handle_exception
 
+
 def get_logger(name: str) -> logging.Logger:
     """Get a logger instance with the app prefix."""
     return logging.getLogger(f"{LOGGER_PREFIX}.{name}")
-
-

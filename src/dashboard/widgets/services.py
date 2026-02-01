@@ -106,10 +106,10 @@ class ServicesTab(Vertical):
     def run_service_command(self, service_name: str, action: str) -> None:
         """Run systemctl command in background."""
         if any(c in service_name for c in ';|&'):
-             msg = f"Invalid service name: {service_name}"
-             logger.warning(f"Security alert: {msg}")
-             self.app.call_from_thread(self.notify, msg, severity="error")
-             return
+            msg = f"Invalid service name: {service_name}"
+            logger.warning(f"Security alert: {msg}")
+            self.app.call_from_thread(self.notify, msg, severity="error")
+            return
 
         try:
             cmd = [SUDO, SYSTEMCTL, action, service_name]
@@ -146,10 +146,14 @@ class ServicesTab(Vertical):
         def sort_key(s):
             state = s.get('state', '').lower()
             active = s.get('active', '').lower()
-            if state == 'running': priority = 0
-            elif state == 'failed' or active == 'failed': priority = 1
-            elif active == 'active': priority = 2
-            else: priority = 3
+            if state == 'running':
+                priority = 0
+            elif state == 'failed' or active == 'failed':
+                priority = 1
+            elif active == 'active':
+                priority = 2
+            else:
+                priority = 3
             return (priority, s.get('name', '').lower())
 
         services.sort(key=sort_key)
