@@ -245,9 +245,9 @@ class F2BDatabaseModal(ModalScreen):
 
             for item in threats:
                 ip = item["ip"]
-                geo = item.get("geo", {})
-                attempts = item.get("attempts", {})
-                bans = item.get("bans", {})
+                geo = item.get("geo") or {}
+                attempts = item.get("attempts") or {}
+                bans = item.get("bans") or {}
 
                 status = "🔒 BAN" if bans.get("active") else "⚪"
                 danger = item.get("danger_score", 0)

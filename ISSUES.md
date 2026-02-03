@@ -56,34 +56,6 @@ DEBUG - [utm.fail2ban_v2] - Recorded ban: 142.93.128.113 from sshd
 
 ---
 
-### 3. ⏳ Table refresh failed: 'NoneType' object is not subscriptable
-
-**Файл:** `src/dashboard/widgets/f2b_db_manage_modal.py`
-**Строки:** 249-251
-
-**Описание:**
-При обновлении таблицы возникает ошибка:
-```
-ERROR - [utm.f2b_db_modal] - Table refresh failed: 'NoneType' object is not subscriptable
-```
-
-**Причина:**
-Использование `dict.get(key, default)` не защищает от случая, когда ключ существует, но его значение равно `None`:
-```python
-geo = item.get("geo", {})       # Вернёт None, если geo=None в данных
-geo.get("country", "?")         # None.get() → ошибка!
-```
-
-**Решение:**
-Использовать `or` для защиты от None:
-```python
-geo = item.get("geo") or {}
-attempts = item.get("attempts") or {}
-bans = item.get("bans") or {}
-```
-
----
-
 ### 5. Packages: "Update All" не обновляет все пакеты
 
 **Файл:** `src/dashboard/widgets/packages.py`
@@ -293,6 +265,50 @@ if self._search_cancel_token != current_token:
 
 ---
 
+### 24. ⏳ flake8 ошибки в fail2ban_v2.py
+
+**Файл:** `src/collectors/fail2ban_v2.py`
+**Приоритет:** 🟢 Низкий
+**Сложность:** Низкая
+
+**Описание:**
+Три ошибки flake8:
+- **F401** — неиспользуемый импорт `Set` из `typing`
+- **F841** — неиспользуемая переменная `timestamp`
+- **W391** — пустая строка в конце файла
+
+**Причина откладывания:**
+Файл планируется к рефакторингу или замене.
+
+---
+
+### 25. C901 cyclomatic complexity — 11 функций
+
+**Приоритет:** 🟢 Низкий
+**Сложность:** Средняя/Высокая
+
+**Описание:**
+Функции с высокой цикломатической сложностью (>15):
+
+| Файл | Функция | Сложность |
+|------|---------|-----------|
+| `src/collectors/fail2ban.py` | `collect` | 21 |
+| `src/collectors/fail2ban.py` | `_get_detailed_jail_info` | 24 |
+| `src/collectors/fail2ban.py` | `_get_bans_with_geo` | 18 |
+| `src/collectors/fail2ban_v2.py` | `_parse_log_file` | 25 |
+| `src/collectors/network.py` | `collect` | 16 |
+| `src/collectors/services.py` | `_get_docker_containers` | 17 |
+| `src/collectors/system.py` | `_get_smart_summary` | 21 |
+| `src/dashboard/widgets/packages.py` | `_populate_table` | 16 |
+| `src/dashboard/widgets/services.py` | `_populate_table` | 16 |
+| `src/dashboard/widgets/system_info.py` | `compose` | 19 |
+| `src/dashboard/widgets/system_info.py` | `_build_storage_panel` | 23 |
+
+**Рекомендация:**
+Разбить на более мелкие методы с чёткой ответственностью. Приоритет — функции с пометкой ⏳ откладываются до рефакторинга Fail2ban.
+
+---
+
 ---
 
 ## Сводная таблица новых проблем
@@ -317,6 +333,8 @@ if self._search_cancel_token != current_token:
 | ~~21~~ | ~~LoggingTab: preview + фоновая загрузка~~ | ✅ Решено | | |
 | 22 | Fail2banPlusTab: lazy loading | 🟡 Средний | Низкая | ⏳ |
 | ~~23~~ | ~~Автообновление версии в README~~ | ✅ Решено | | |
+| 24 | flake8 ошибки в fail2ban_v2.py | 🟢 Низкий | Низкая | ⏳ |
+| 25 | C901 cyclomatic complexity (11 функций) | 🟢 Низкий | Средняя | частично ⏳ |
 
 > ⏳ = связано с Fail2ban (планируется рефакторинг)
 
@@ -681,3 +699,16 @@ for line in result.stdout.splitlines():
 - Добавлен generic updater в `release-please-config.json`
 - Добавлены маркеры `x-release-please-start-version` / `x-release-please-end-version` в README.md
 - Версия теперь обновляется автоматически при релизе
+
+---
+
+### ✅ 3. Table refresh failed: 'NoneType' object is not subscriptable
+
+**Проблема:** В `f2b_db_manage_modal.py` использование `dict.get(key, {})` не защищало от случая, когда ключ существует, но значение равно `None`. Это вызывало ошибку `None.get()`.
+
+**Решение:** Заменено на `dict.get(key) or {}` для защиты от `None`:
+```python
+geo = item.get("geo") or {}
+attempts = item.get("attempts") or {}
+bans = item.get("bans") or {}
+```
