@@ -141,7 +141,7 @@ class PackagesTab(Vertical):
     def action_update_all(self) -> None:
         """Update all packages."""
         self.notify("Starting full system upgrade...", severity="warning")
-        self.run_update_command([SUDO, APT_GET, "upgrade", "-y"])
+        self.run_update_command([SUDO, "sh", "-c", "apt-get update && apt-get upgrade -y"])
 
     @work(thread=True)
     def run_update_command(self, cmd: list) -> None:
