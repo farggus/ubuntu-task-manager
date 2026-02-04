@@ -1,5 +1,7 @@
 """Main dashboard application using Textual with tabbed interface."""
 
+from __future__ import annotations
+
 import json
 import os as os_module
 import platform
@@ -25,18 +27,11 @@ from collectors import (
     TasksCollector,
     UsersCollector,
 )
-from dashboard.widgets.containers import ContainersTab
-from dashboard.widgets.disks import DisksTab
-from dashboard.widgets.fail2ban import Fail2banTab
-from dashboard.widgets.fail2ban_plus import Fail2banPlusTab
-from dashboard.widgets.logging import LoggingTab
-from dashboard.widgets.network import NetworkExtendedTab
-from dashboard.widgets.packages import PackagesTab
-from dashboard.widgets.processes import ProcessesTab
-from dashboard.widgets.services import ServicesTab
-from dashboard.widgets.system_info import CompactSystemInfo
-from dashboard.widgets.tasks import TasksExtendedTab
-from dashboard.widgets.users import UsersTab
+
+# Lazy imports - these are imported inside compose() to avoid blocking on startup
+# from dashboard.widgets.* import ...
+# from dashboard.widgets.system_info import CompactSystemInfo
+
 from utils.logger import get_logger
 
 logger = get_logger("dashboard")
@@ -213,6 +208,20 @@ class UTMDashboard(App):
 
     def compose(self) -> ComposeResult:
         """Compose UI hierarchy with lazy tab loading."""
+        # Lazy import widgets - done here instead of module level to avoid blocking startup
+        from dashboard.widgets.containers import ContainersTab
+        from dashboard.widgets.disks import DisksTab
+        from dashboard.widgets.fail2ban import Fail2banTab
+        from dashboard.widgets.fail2ban_plus import Fail2banPlusTab
+        from dashboard.widgets.logging import LoggingTab
+        from dashboard.widgets.network import NetworkExtendedTab
+        from dashboard.widgets.packages import PackagesTab
+        from dashboard.widgets.processes import ProcessesTab
+        from dashboard.widgets.services import ServicesTab
+        from dashboard.widgets.system_info import CompactSystemInfo
+        from dashboard.widgets.tasks import TasksExtendedTab
+        from dashboard.widgets.users import UsersTab
+
         start = time.time()
 
         # Header (fast)
