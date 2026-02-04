@@ -27,12 +27,12 @@ from collectors import (
     TasksCollector,
     UsersCollector,
 )
+from utils.logger import get_logger
 
 # Lazy imports - these are imported inside compose() to avoid blocking on startup
 # from dashboard.widgets.* import ...
 # from dashboard.widgets.system_info import CompactSystemInfo
 
-from utils.logger import get_logger
 
 logger = get_logger("dashboard")
 
@@ -244,6 +244,7 @@ class UTMDashboard(App):
                 t = time.time()
                 with TabPane("[b green]1[/] Processes", id="processes"):
                     from textual.widgets import Static
+
                     # Create placeholder - actual ProcessesTab will be mounted asynchronously
                     yield Static("Loading...")  # Fast placeholder
                 logger.debug(f"  Processes tab placeholder: {(time.time()-t)*1000:.1f}ms")
@@ -360,6 +361,7 @@ class UTMDashboard(App):
     def action_refresh(self) -> None:
         """Refresh only CompactSystemInfo and the active tab."""
         from dashboard.widgets.system_info import CompactSystemInfo
+
         # Always refresh system info panel
         try:
             self.query_one(CompactSystemInfo).update_data()

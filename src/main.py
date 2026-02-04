@@ -33,12 +33,14 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 _mark("Before const import")
 from const import APP_NAME, APP_VERSION, DEFAULT_CONFIG, LOGGER_PREFIX, SLOW_BOTS_FILE  # noqa: E402
+
 _mark("After const import")
 
 _mark("Skipping dashboard import at module level")
 
 _mark("Before logger import")
 from utils.logger import setup_exception_logging, setup_logging  # noqa: E402
+
 _mark("After logger import")
 
 # Load environment variables from .env file
