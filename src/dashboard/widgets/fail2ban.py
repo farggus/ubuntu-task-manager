@@ -17,13 +17,7 @@ from collectors import Fail2banCollector
 from dashboard.widgets.analysis_modal import AnalysisModal
 from dashboard.widgets.confirm_modal import ConfirmModal
 from dashboard.widgets.whitelist_modal import WhitelistModal
-from utils.formatters import (
-    format_attempts,
-    format_banned_count,
-    format_bantime,
-    format_jail_status,
-    format_org,
-)
+from utils.formatters import format_attempts, format_banned_count, format_bantime, format_jail_status, format_org
 from utils.logger import get_logger
 from utils.ui_helpers import update_table_preserving_scroll
 

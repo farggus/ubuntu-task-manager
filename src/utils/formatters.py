@@ -4,13 +4,7 @@ from datetime import datetime, timedelta
 
 from rich.text import Text
 
-from const import (
-    ORG_DISPLAY_MAX_LEN,
-    SECONDS_IN_DAY,
-    SECONDS_IN_HOUR,
-    SECONDS_IN_MINUTE,
-    SECONDS_IN_YEAR,
-)
+from const import ORG_DISPLAY_MAX_LEN, SECONDS_IN_DAY, SECONDS_IN_HOUR, SECONDS_IN_MINUTE, SECONDS_IN_YEAR
 
 
 def format_attempts(attempts: int) -> Text:

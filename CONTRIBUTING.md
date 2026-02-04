@@ -24,6 +24,9 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
+
+# Setup pre-commit hooks
+pre-commit install
 ```
 
 ### Running the Application
@@ -96,7 +99,24 @@ def get_jail_info(jail_name: str) -> Optional[Dict[str, Any]]:
     return jail_data
 ```
 
-### Running Linters
+### Pre-commit Hooks
+
+We use pre-commit to automatically run checks before each commit:
+
+```bash
+# Install hooks (one-time setup)
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+
+# Skip hooks (not recommended)
+git commit --no-verify
+```
+
+Pre-commit runs: black, isort, flake8, bandit, and general checks (trailing whitespace, YAML/JSON validation).
+
+### Running Linters Manually
 
 ```bash
 # Run all linters
@@ -226,10 +246,9 @@ class MyWidget(Static):
 
 ### Before Submitting
 
-1. **Run tests**: `pytest tests/ -v`
-2. **Run linters**: `flake8 src/ && isort --check-only src/`
-3. **Check security**: `bandit -r src/ -c pyproject.toml`
-4. **Update documentation** if needed
+1. **Run pre-commit**: `pre-commit run --all-files` (runs linters + security checks)
+2. **Run tests**: `pytest tests/ -v`
+3. **Update documentation** if needed
 
 ### PR Guidelines
 

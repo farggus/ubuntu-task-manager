@@ -52,8 +52,10 @@ class SmartModal(ModalScreen):
 
     def on_mount(self) -> None:
         """Fetch SMART report when the modal is mounted."""
-        self.query_one(RichLog).write(f"""[dim]Fetching SMART report for {self.disk_device}...
-This may take a moment.[/dim]""")
+        self.query_one(RichLog).write(
+            f"""[dim]Fetching SMART report for {self.disk_device}...
+This may take a moment.[/dim]"""
+        )
         self.fetch_smart_report()
 
     @work(thread=True, exclusive=True)
@@ -89,7 +91,8 @@ This may take a moment.[/dim]""")
         )
         self.app.call_from_thread(
             log_view.write,
-            "[dim]This may be a USB device that doesn't support SMART passthrough, or the disk doesn't support SMART.[/dim]",
+            "[dim]This may be a USB device that doesn't support SMART passthrough, "
+            "or the disk doesn't support SMART.[/dim]",
         )
 
     def _try_smartctl(self, device_type: str = None) -> subprocess.CompletedProcess:

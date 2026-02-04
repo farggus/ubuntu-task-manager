@@ -288,7 +288,10 @@ class DisksTab(Vertical):
         else:
             percent_style = "green"
 
-        line2 = f"Total: [bold]{total_str}[/bold] │ Used: [bold]{used_str}[/bold] ([{percent_style}]{percent:.1f}%[/{percent_style}])"
+        line2 = (
+            f"Total: [bold]{total_str}[/bold] │ "
+            f"Used: [bold]{used_str}[/bold] ([{percent_style}]{percent:.1f}%[/{percent_style}])"
+        )
 
         # Add warnings if any
         if warnings:

@@ -309,6 +309,41 @@ custom_checks:
 - `python-dateutil` - Date utilities
 - `pytest` - Testing (dev)
 
+## Development
+
+### Setup
+
+```bash
+# Install dev dependencies
+pip install -r requirements-dev.txt
+
+# Setup pre-commit hooks
+pre-commit install
+```
+
+### Pre-commit Hooks
+
+The project uses pre-commit to run checks before each commit:
+- **black** - Code formatting
+- **isort** - Import sorting
+- **flake8** - Linting
+- **bandit** - Security checks
+
+```bash
+# Run manually on all files
+pre-commit run --all-files
+
+# Skip hooks (not recommended)
+git commit --no-verify
+```
+
+### Testing
+
+```bash
+pytest tests/ -v
+pytest tests/ -v --cov=src --cov-report=term-missing
+```
+
 ## License
 
 MIT

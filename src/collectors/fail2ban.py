@@ -9,14 +9,7 @@ import time
 import urllib.request
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from const import (
-    BANS_DB_FILE,
-    IP_CACHE_TTL,
-    RECIDIVE_BANTIME,
-    SLOW_BOTS_FILE,
-    UNBAN_HISTORY_LIMIT,
-    WHITELIST_FILE,
-)
+from const import BANS_DB_FILE, IP_CACHE_TTL, RECIDIVE_BANTIME, SLOW_BOTS_FILE, UNBAN_HISTORY_LIMIT, WHITELIST_FILE
 from utils.binaries import FAIL2BAN_CLIENT, GREP, TAIL
 from utils.formatters import format_interval
 from utils.logger import get_logger

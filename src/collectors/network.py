@@ -5,13 +5,7 @@ from typing import Any, Dict, List
 
 import psutil
 
-from utils.binaries import (
-    FIREWALL_CMD,
-    IP,
-    IPTABLES,
-    NFT,
-    UFW,
-)
+from utils.binaries import FIREWALL_CMD, IP, IPTABLES, NFT, UFW
 from utils.logger import get_logger
 
 from .base import BaseCollector
