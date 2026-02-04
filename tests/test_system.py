@@ -599,6 +599,11 @@ class TestSmartPersistence(unittest.TestCase):
     """Tests for persistent SMART disk cache."""
 
     def setUp(self):
+        import os
+        from const import DISK_CACHE_FILE
+        # Clean up cache file before each test for isolation
+        if os.path.exists(DISK_CACHE_FILE):
+            os.unlink(DISK_CACHE_FILE)
         self.collector = SystemCollector()
 
     def test_save_creates_file(self):
