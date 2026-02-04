@@ -119,6 +119,7 @@ class CompactSystemInfo(Horizontal):
         self.swap_history: deque = deque(maxlen=60)
         self.os_name = "Loading..."
         self._clock_timer = None
+        self._data_loaded = False
 
     def compose(self):
         # Column 1: Overview
@@ -158,7 +159,7 @@ class CompactSystemInfo(Horizontal):
             yield Static(id="disk_info")
 
     def on_mount(self) -> None:
-        """Update data when mounted."""
+        """Setup UI when mounted (defer data loading to next event cycle)."""
         # Initialize interval display
         interval = getattr(self.app, 'update_interval', 2000)
         self.border_subtitle = f"[dim]-[/dim] [bold cyan]{interval}[/bold cyan] [dim]+[/dim]"
@@ -170,9 +171,24 @@ class CompactSystemInfo(Horizontal):
         self.update_header_clock()
         self._clock_timer = self.set_interval(1.0, self.update_header_clock)
 
-        self.update_data()
+        # Defer initial data load to next event cycle to avoid blocking UI
+        self.call_later(self._load_initial_data)
+
         # Use initial interval from app (convert ms to seconds)
         self._update_timer = self.set_interval(interval / 1000, self.update_data)
+
+    def _load_initial_data(self) -> None:
+        """Load initial data after UI is fully ready."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self.update_data()
+
+    def on_show(self) -> None:
+        """Load data if not loaded yet (for lazy tab widgets)."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            # Trigger first data load (doesn't block UI due to @work decorator)
+            self.update_data()
 
     @work(thread=True)
     def _fetch_initial_os_info(self) -> None:
