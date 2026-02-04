@@ -64,7 +64,7 @@ class ContainersTab(Vertical):
     def __init__(self, collector: ServicesCollector):
         super().__init__()
         self.collector = collector
-        self.view_mode = 'all'  # 'all', 'running', 'stopped'
+        self.view_mode = "all"  # 'all', 'running', 'stopped'
         self._data_loaded = False
 
     def compose(self):
@@ -89,13 +89,13 @@ class ContainersTab(Vertical):
         table.add_columns("ID", "Name", "Stack", "Image", "Status", "IP Address", "Ports")
 
     def action_view_all(self):
-        self._set_view_mode('all', "Showing all containers")
+        self._set_view_mode("all", "Showing all containers")
 
     def action_view_running(self):
-        self._set_view_mode('running', "Showing running containers")
+        self._set_view_mode("running", "Showing running containers")
 
     def action_view_stopped(self):
-        self._set_view_mode('stopped', "Showing stopped containers")
+        self._set_view_mode("stopped", "Showing stopped containers")
 
     def _set_view_mode(self, mode: str, message: str):
         if self.view_mode != mode:
@@ -153,11 +153,11 @@ class ContainersTab(Vertical):
             client = docker.from_env()
             container = client.containers.get(container_id)
 
-            if action == 'start':
+            if action == "start":
                 container.start()
-            elif action == 'stop':
+            elif action == "stop":
                 container.stop()
-            elif action == 'restart':
+            elif action == "restart":
                 container.restart()
 
             msg = f"Container {container_id} {action}ed successfully."
@@ -176,7 +176,7 @@ class ContainersTab(Vertical):
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:
         data = self.collector.update()
-        docker_data = data.get('docker') or {}
+        docker_data = data.get("docker") or {}
         self.app.call_from_thread(self.update_table, docker_data)
 
     def update_table(self, data: Dict[str, Any]) -> None:
@@ -184,37 +184,37 @@ class ContainersTab(Vertical):
         header = self.query_one("#container_header", Label)
 
         # Handle errors from collector
-        if data.get('error'):
-            error_msg = data['error']
+        if data.get("error"):
+            error_msg = data["error"]
             header.update(f"[bold red]⚠ {error_msg}[/bold red]")
             table.clear()
             return
 
-        containers = data.get('containers', [])
+        containers = data.get("containers", [])
 
         def populate(t):
             # Filter
             filtered_list: List[Dict[str, Any]] = []
-            if self.view_mode == 'running':
-                filtered_list = [c for c in containers if 'running' in c.get('status', '').lower()]
-            elif self.view_mode == 'stopped':
-                filtered_list = [c for c in containers if 'running' not in c.get('status', '').lower()]
+            if self.view_mode == "running":
+                filtered_list = [c for c in containers if "running" in c.get("status", "").lower()]
+            elif self.view_mode == "stopped":
+                filtered_list = [c for c in containers if "running" not in c.get("status", "").lower()]
             else:
                 filtered_list = containers
 
             # Sort
-            filtered_list.sort(key=lambda c: (c.get('stack', ''), c.get('name', '')))
+            filtered_list.sort(key=lambda c: (c.get("stack", ""), c.get("name", "")))
 
             # Populate
             for container in filtered_list:
-                cid = container.get('id', '')
-                name = container.get('name', '')
-                stack = container.get('stack', '')
-                image = container.get('image', '')
-                status = container.get('status', '')
-                ip_address = container.get('ip_address', 'N/A')
+                cid = container.get("id", "")
+                name = container.get("name", "")
+                stack = container.get("stack", "")
+                image = container.get("image", "")
+                status = container.get("status", "")
+                ip_address = container.get("ip_address", "N/A")
 
-                ports_dict = container.get('ports', {})
+                ports_dict = container.get("ports", {})
                 ports_list = []
                 if ports_dict:
                     for internal, host_list in ports_dict.items():
@@ -229,9 +229,9 @@ class ContainersTab(Vertical):
         update_table_preserving_scroll(table, populate)
 
         # Update Header
-        total = data.get('total', 0)
-        running = data.get('running', 0)
-        stopped = data.get('stopped', 0)
+        total = data.get("total", 0)
+        running = data.get("running", 0)
+        stopped = data.get("stopped", 0)
 
         stopped_color = "red" if stopped > 0 else "green"
         header_text = (

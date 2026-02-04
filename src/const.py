@@ -1,4 +1,5 @@
 """Application constants."""
+
 import os
 from pathlib import Path
 
@@ -16,13 +17,13 @@ CONFIG_DIR = BASE_DIR / "config"
 DEFAULT_CONFIG = str(CONFIG_DIR / "config.yaml")
 
 CACHE_DIR = BASE_DIR / "cache"
-BANS_DB_FILE = os.path.join(CACHE_DIR, 'bans_db.json')
-SLOW_BOTS_FILE = os.path.join(CACHE_DIR, 'suspicious_ips.json')
-WHITELIST_FILE = os.path.join(CACHE_DIR, 'whitelist.json')
-DISK_CACHE_FILE = os.path.join(CACHE_DIR, 'disk_cache.json')
-SERVICE_STATS_CACHE_FILE = os.path.join(CACHE_DIR, 'service_stats_cache.json')
-PACKAGE_STATS_CACHE_FILE = os.path.join(CACHE_DIR, 'package_stats_cache.json')
-DISK_HIERARCHY_CACHE_FILE = os.path.join(CACHE_DIR, 'disk_hierarchy_cache.json')
+BANS_DB_FILE = os.path.join(CACHE_DIR, "bans_db.json")
+SLOW_BOTS_FILE = os.path.join(CACHE_DIR, "suspicious_ips.json")
+WHITELIST_FILE = os.path.join(CACHE_DIR, "whitelist.json")
+DISK_CACHE_FILE = os.path.join(CACHE_DIR, "disk_cache.json")
+SERVICE_STATS_CACHE_FILE = os.path.join(CACHE_DIR, "service_stats_cache.json")
+PACKAGE_STATS_CACHE_FILE = os.path.join(CACHE_DIR, "package_stats_cache.json")
+DISK_HIERARCHY_CACHE_FILE = os.path.join(CACHE_DIR, "disk_hierarchy_cache.json")
 
 # Time constants (seconds)
 SECONDS_IN_MINUTE = 60

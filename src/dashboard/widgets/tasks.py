@@ -122,14 +122,14 @@ class TasksExtendedTab(Vertical):
             header = self.query_one("#tasks_header", Label)
 
             # Get stats for header (always show both)
-            cron_data = self._last_data.get('cron', {})
-            cron_total = len(cron_data.get('all_jobs', []))
+            cron_data = self._last_data.get("cron", {})
+            cron_total = len(cron_data.get("all_jobs", []))
 
-            timers_data = self._last_data.get('systemd_timers', {})
-            timers_list = timers_data.get('timers', [])
+            timers_data = self._last_data.get("systemd_timers", {})
+            timers_list = timers_data.get("timers", [])
             timers_total = len(timers_list)
-            timers_enabled = sum(1 for t in timers_list if self._parse_timer_state(t.get('state', ''))[0] == 'enabled')
-            timers_active = sum(1 for t in timers_list if t.get('next_run', 'n/a') != 'n/a')
+            timers_enabled = sum(1 for t in timers_list if self._parse_timer_state(t.get("state", ""))[0] == "enabled")
+            timers_active = sum(1 for t in timers_list if t.get("next_run", "n/a") != "n/a")
 
             # Build header
             if self._show_cron:
@@ -159,49 +159,41 @@ class TasksExtendedTab(Vertical):
         systemctl list-unit-files returns: 'enabled enabled', 'disabled enabled', 'static -', etc.
         """
         parts = state_str.split()
-        enabled_state = parts[0] if parts else 'unknown'
-        preset = parts[1] if len(parts) > 1 else '-'
+        enabled_state = parts[0] if parts else "unknown"
+        preset = parts[1] if len(parts) > 1 else "-"
         return enabled_state, preset
 
     # Colors for different users
-    USER_COLORS = [
-        'cyan', 'green', 'yellow', 'magenta', 'blue',
-        'bright_cyan', 'bright_green', 'bright_magenta'
-    ]
+    USER_COLORS = ["cyan", "green", "yellow", "magenta", "blue", "bright_cyan", "bright_green", "bright_magenta"]
 
     def _get_user_color(self, user: str) -> str:
         """Get consistent color for a user."""
-        if user == 'root':
-            return 'bold red'
+        if user == "root":
+            return "bold red"
         # Hash username to get consistent color index
         color_idx = hash(user) % len(self.USER_COLORS)
         return self.USER_COLORS[color_idx]
 
     def _populate_cron(self, table: DataTable, data: Dict[str, Any]) -> None:
         """Populate table with cron jobs."""
-        cron_data = data.get('cron', {})
+        cron_data = data.get("cron", {})
 
         def populate(t):
-            jobs = cron_data.get('all_jobs', [])
+            jobs = cron_data.get("all_jobs", [])
             if not jobs:
                 t.add_row("No cron jobs found", "", "", "")
                 return
 
             for job in jobs:
                 try:
-                    user = job.get('user', 'N/A')
-                    sched = job.get('schedule', {}).get('human', 'N/A')
-                    next_run = job.get('next_run_human', 'N/A')
-                    command = job.get('command', 'N/A')
+                    user = job.get("user", "N/A")
+                    sched = job.get("schedule", {}).get("human", "N/A")
+                    next_run = job.get("next_run_human", "N/A")
+                    command = job.get("command", "N/A")
 
-                    if user == 'root':
+                    if user == "root":
                         # Root: only username in red
-                        t.add_row(
-                            Text(user, style="bold red"),
-                            sched,
-                            next_run,
-                            command
-                        )
+                        t.add_row(Text(user, style="bold red"), sched, next_run, command)
                     else:
                         # Other users: whole row in user color
                         user_color = self._get_user_color(user)
@@ -209,7 +201,7 @@ class TasksExtendedTab(Vertical):
                             Text(user, style=user_color),
                             Text(sched, style=user_color),
                             Text(next_run, style=user_color),
-                            Text(command, style=user_color)
+                            Text(command, style=user_color),
                         )
                 except Exception as e:
                     logger.debug(f"Error processing cron job: {e}")
@@ -219,32 +211,32 @@ class TasksExtendedTab(Vertical):
 
     def _populate_timers(self, table: DataTable, data: Dict[str, Any]) -> None:
         """Populate table with systemd timers."""
-        timers_data = data.get('systemd_timers', {})
+        timers_data = data.get("systemd_timers", {})
 
         def populate(t):
-            timers = timers_data.get('timers', [])
+            timers = timers_data.get("timers", [])
             if not timers:
                 t.add_row("No systemd timers found", "", "", "", "", "")
                 return
 
             for tm in timers:
                 try:
-                    name = tm.get('name', 'N/A').replace('.timer', '')
-                    state_raw = tm.get('state', 'unknown')
-                    next_run = tm.get('next_run', 'n/a')
-                    last_trigger = tm.get('last_trigger', 'n/a')
-                    description = tm.get('description', '')
+                    name = tm.get("name", "N/A").replace(".timer", "")
+                    state_raw = tm.get("state", "unknown")
+                    next_run = tm.get("next_run", "n/a")
+                    last_trigger = tm.get("last_trigger", "n/a")
+                    description = tm.get("description", "")
 
                     # Parse state into enabled_state and determine if active
                     enabled_state, _ = self._parse_timer_state(state_raw)
-                    is_active = next_run != 'n/a'
+                    is_active = next_run != "n/a"
 
                     # Color enabled state
-                    if enabled_state == 'enabled':
+                    if enabled_state == "enabled":
                         enabled_text = Text(enabled_state, style="green")
-                    elif enabled_state == 'disabled':
+                    elif enabled_state == "disabled":
                         enabled_text = Text(enabled_state, style="red")
-                    elif enabled_state == 'static':
+                    elif enabled_state == "static":
                         enabled_text = Text(enabled_state, style="dim")
                     else:
                         enabled_text = Text(enabled_state, style="yellow")

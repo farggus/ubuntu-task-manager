@@ -21,10 +21,10 @@ logger = get_logger("users_widget")
 class UsersTab(Vertical):
     """Tab displaying user sessions and system users."""
 
-    VIEW_ALL = 'all'
-    VIEW_USERS = 'users'
-    VIEW_SYSTEM = 'system'
-    VIEW_SESSIONS = 'sessions'
+    VIEW_ALL = "all"
+    VIEW_USERS = "users"
+    VIEW_SYSTEM = "system"
+    VIEW_SESSIONS = "sessions"
 
     BINDINGS = [
         Binding("a", "show_all", "All Users"),
@@ -59,7 +59,7 @@ class UsersTab(Vertical):
     """
 
     # Colors for different users
-    USER_COLORS = ['cyan', 'green', 'yellow', 'magenta', 'blue', 'bright_cyan', 'bright_green', 'bright_magenta']
+    USER_COLORS = ["cyan", "green", "yellow", "magenta", "blue", "bright_cyan", "bright_green", "bright_magenta"]
 
     def __init__(self, collector: UsersCollector):
         super().__init__()
@@ -137,7 +137,7 @@ class UsersTab(Vertical):
             pid_text = row_data[5]
             pid_str = pid_text.plain if isinstance(pid_text, Text) else str(pid_text)
 
-            if pid_str and pid_str != '-' and pid_str.isdigit():
+            if pid_str and pid_str != "-" and pid_str.isdigit():
                 pid = int(pid_str)
                 try:
                     os.kill(pid, signal.SIGTERM)
@@ -183,9 +183,9 @@ class UsersTab(Vertical):
             if self._current_view == self.VIEW_SESSIONS:
                 self._populate_sessions(table)
             elif self._current_view == self.VIEW_USERS:
-                self._populate_users(table, user_type='human')
+                self._populate_users(table, user_type="human")
             elif self._current_view == self.VIEW_SYSTEM:
-                self._populate_users(table, user_type='system')
+                self._populate_users(table, user_type="system")
             else:  # VIEW_ALL
                 self._populate_users(table, user_type=None)
 
@@ -197,22 +197,22 @@ class UsersTab(Vertical):
         data = self._last_data or {}
 
         # Users stats
-        users_list = data.get('users_list', [])
+        users_list = data.get("users_list", [])
         total_users = len(users_list)
-        human_users = len([u for u in users_list if u.get('type') == 'human'])
-        system_users = len([u for u in users_list if u.get('type') == 'system'])
+        human_users = len([u for u in users_list if u.get("type") == "human"])
+        system_users = len([u for u in users_list if u.get("type") == "system"])
 
         # Sessions stats
-        sessions = data.get('sessions', [])
+        sessions = data.get("sessions", [])
         sessions_count = len(sessions)
-        unique_session_users = len(set(s.get('name') for s in sessions))
+        unique_session_users = len(set(s.get("name") for s in sessions))
 
         # Current view indicator
         view_labels = {
-            self.VIEW_ALL: '► All Users',
-            self.VIEW_USERS: '► Users',
-            self.VIEW_SYSTEM: '► System',
-            self.VIEW_SESSIONS: '► Sessions',
+            self.VIEW_ALL: "► All Users",
+            self.VIEW_USERS: "► Users",
+            self.VIEW_SYSTEM: "► System",
+            self.VIEW_SESSIONS: "► Sessions",
         }
         current = f"[bold cyan]{view_labels[self._current_view]}[/bold cyan]"
 
@@ -233,41 +233,42 @@ class UsersTab(Vertical):
 
     def _populate_sessions(self, table: DataTable) -> None:
         """Populate table with active sessions."""
+
         def populate(t):
-            sessions = self._last_data.get('sessions', [])
+            sessions = self._last_data.get("sessions", [])
             if not sessions:
                 t.add_row("No active sessions", "", "", "", "", "")
                 return
 
             for s in sessions:
                 try:
-                    name = s.get('name', 'N/A')
-                    terminal = s.get('terminal', '?')
-                    host = s.get('host', 'local')
-                    login_time = s.get('login_time', 'N/A')
-                    duration = s.get('duration', 'N/A')
-                    pid = s.get('pid', '-')
+                    name = s.get("name", "N/A")
+                    terminal = s.get("terminal", "?")
+                    host = s.get("host", "local")
+                    login_time = s.get("login_time", "N/A")
+                    duration = s.get("duration", "N/A")
+                    pid = s.get("pid", "-")
 
                     # Color username
                     user_color = self._get_user_color(name)
                     name_text = Text(name, style=f"bold {user_color}")
 
                     # Color terminal (pts = cyan, tty = green)
-                    if terminal.startswith('pts'):
+                    if terminal.startswith("pts"):
                         term_text = Text(terminal, style="cyan")
-                    elif terminal.startswith('tty'):
+                    elif terminal.startswith("tty"):
                         term_text = Text(terminal, style="green")
                     else:
                         term_text = Text(terminal, style="dim")
 
                     # Color host (local = dim, remote = yellow)
-                    if host == 'local' or host == ':0' or not host:
-                        host_text = Text(host or 'local', style="dim")
+                    if host == "local" or host == ":0" or not host:
+                        host_text = Text(host or "local", style="dim")
                     else:
                         host_text = Text(host, style="yellow")
 
                     # PID
-                    pid_text = Text(str(pid) if pid else '-', style="dim")
+                    pid_text = Text(str(pid) if pid else "-", style="dim")
 
                     t.add_row(name_text, term_text, host_text, login_time, duration, pid_text)
                 except Exception as e:
@@ -278,39 +279,40 @@ class UsersTab(Vertical):
 
     def _populate_users(self, table: DataTable, user_type: str = None) -> None:
         """Populate table with users, optionally filtered by type."""
+
         def populate(t):
-            users = self._last_data.get('users_list', [])
+            users = self._last_data.get("users_list", [])
             if not users:
                 t.add_row("No users found", "", "", "", "", "")
                 return
 
             # Filter by type if specified
             if user_type:
-                users = [u for u in users if u.get('type') == user_type]
+                users = [u for u in users if u.get("type") == user_type]
 
             if not users:
                 t.add_row(f"No {user_type} users found", "", "", "", "", "")
                 return
 
             # Sort: human users first, then by name
-            users = sorted(users, key=lambda x: (x.get('type') != 'human', x.get('name', '')))
+            users = sorted(users, key=lambda x: (x.get("type") != "human", x.get("name", "")))
 
             for u in users:
                 try:
-                    name = u.get('name', 'N/A')
-                    uid = u.get('uid', 0)
-                    gid = u.get('gid', 0)
-                    shell = u.get('shell', 'N/A')
-                    home = u.get('home', 'N/A')
-                    desc = u.get('description', '')
-                    u_type = u.get('type', 'system')
+                    name = u.get("name", "N/A")
+                    uid = u.get("uid", 0)
+                    gid = u.get("gid", 0)
+                    shell = u.get("shell", "N/A")
+                    home = u.get("home", "N/A")
+                    desc = u.get("description", "")
+                    u_type = u.get("type", "system")
 
                     # Color based on user type
                     if uid == 0:
                         # Root user - red
                         name_text = Text(name, style="bold red")
                         uid_text = Text(str(uid), style="red")
-                    elif u_type == 'human':
+                    elif u_type == "human":
                         # Regular users - green
                         name_text = Text(name, style="bold green")
                         uid_text = Text(str(uid), style="green")
@@ -320,30 +322,23 @@ class UsersTab(Vertical):
                         uid_text = Text(str(uid), style="dim")
 
                     # Color shell (nologin/false = dim red, bash/zsh/fish = green)
-                    shell_name = shell.split('/')[-1] if shell else ''
-                    if shell_name in ['nologin', 'false']:
+                    shell_name = shell.split("/")[-1] if shell else ""
+                    if shell_name in ["nologin", "false"]:
                         shell_text = Text(shell, style="dim red")
-                    elif shell_name in ['bash', 'zsh', 'fish', 'sh']:
+                    elif shell_name in ["bash", "zsh", "fish", "sh"]:
                         shell_text = Text(shell, style="green")
                     else:
                         shell_text = Text(shell, style="dim")
 
                     # Home directory
-                    if home.startswith('/home/'):
+                    if home.startswith("/home/"):
                         home_text = Text(home, style="cyan")
-                    elif home == '/root':
+                    elif home == "/root":
                         home_text = Text(home, style="red")
                     else:
                         home_text = Text(home, style="dim")
 
-                    t.add_row(
-                        name_text,
-                        uid_text,
-                        str(gid),
-                        shell_text,
-                        home_text,
-                        desc or '-'
-                    )
+                    t.add_row(name_text, uid_text, str(gid), shell_text, home_text, desc or "-")
                 except Exception as e:
                     logger.debug(f"Error processing user: {e}")
                     continue

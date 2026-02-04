@@ -19,36 +19,36 @@ logger = get_logger("disks_tab")
 
 # Color scheme by disk type
 DISK_TYPE_COLORS = {
-    'nvme': 'cyan',
-    'ssd': 'green',
-    'hdd': 'blue',
-    'lvm': 'magenta',
-    'part': 'white',
+    "nvme": "cyan",
+    "ssd": "green",
+    "hdd": "blue",
+    "lvm": "magenta",
+    "part": "white",
 }
 
 DISK_TYPE_LABELS = {
-    'nvme': 'NVMe',
-    'ssd': 'SSD',
-    'hdd': 'HDD',
-    'lvm': 'lvm',
-    'part': 'part',
+    "nvme": "NVMe",
+    "ssd": "SSD",
+    "hdd": "HDD",
+    "lvm": "lvm",
+    "part": "part",
 }
 
 # Color scheme for filesystem types
 FSTYPE_COLORS = {
-    'ext4': 'green',
-    'ext3': 'green',
-    'ext2': 'green',
-    'xfs': 'cyan',
-    'btrfs': 'magenta',
-    'zfs': 'magenta',
-    'ntfs': 'yellow',
-    'vfat': 'yellow',
-    'fat32': 'yellow',
-    'exfat': 'yellow',
-    'swap': 'red',
-    'LVM2_member': 'blue',
-    'crypto_LUKS': 'red',
+    "ext4": "green",
+    "ext3": "green",
+    "ext2": "green",
+    "xfs": "cyan",
+    "btrfs": "magenta",
+    "zfs": "magenta",
+    "ntfs": "yellow",
+    "vfat": "yellow",
+    "fat32": "yellow",
+    "exfat": "yellow",
+    "swap": "red",
+    "LVM2_member": "blue",
+    "crypto_LUKS": "red",
 }
 
 
@@ -135,7 +135,7 @@ class DisksTab(Vertical):
         """Update data in background."""
         data = self.collector.update()
         if data:
-            disk_data = data.get('disk', {})
+            disk_data = data.get("disk", {})
             self.app.call_from_thread(self.update_table, disk_data)
 
     def update_table(self, data: Dict[str, Any]) -> None:
@@ -144,29 +144,29 @@ class DisksTab(Vertical):
             return
         table = self.query_one(DataTable)
 
-        hierarchy = data.get('hierarchy', [])
+        hierarchy = data.get("hierarchy", [])
         self._hierarchy = hierarchy  # Store for SMART lookup
 
         # Update header with stats
         self._update_header(hierarchy)
 
         # Get I/O stats
-        io_stats = data.get('io', {}).get('per_disk', {})
+        io_stats = data.get("io", {}).get("per_disk", {})
 
         def populate(t):
             for disk_idx, disk in enumerate(hierarchy):
-                disk_name = disk.get('name', '')
+                disk_name = disk.get("name", "")
                 disk_io = io_stats.get(disk_name, {})
                 self._add_disk_row(t, disk, disk_io)
-                children = disk.get('children', [])
+                children = disk.get("children", [])
                 for i, part in enumerate(children):
-                    is_last_part = (i == len(children) - 1)
-                    self._add_child_row(t, part, level=1, is_last=is_last_part, parent_type=disk.get('type'))
+                    is_last_part = i == len(children) - 1
+                    self._add_child_row(t, part, level=1, is_last=is_last_part, parent_type=disk.get("type"))
                     # LVM children of partition
-                    lvm_children = part.get('children', [])
+                    lvm_children = part.get("children", [])
                     for j, lvm in enumerate(lvm_children):
-                        is_last_lvm = (j == len(lvm_children) - 1)
-                        self._add_child_row(t, lvm, level=2, is_last=is_last_lvm, parent_type='lvm')
+                        is_last_lvm = j == len(lvm_children) - 1
+                        self._add_child_row(t, lvm, level=2, is_last=is_last_lvm, parent_type="lvm")
 
                 # Add empty separator row after each disk (except the last one)
                 if disk_idx < len(hierarchy) - 1:
@@ -177,8 +177,8 @@ class DisksTab(Vertical):
     def _update_header(self, hierarchy: List[Dict[str, Any]]) -> None:
         """Update header with disk statistics."""
         # Count disks by type and collect stats
-        type_counts = {'nvme': 0, 'ssd': 0, 'hdd': 0}
-        usb_by_type = {'nvme': 0, 'ssd': 0, 'hdd': 0}  # USB disks per type
+        type_counts = {"nvme": 0, "ssd": 0, "hdd": 0}
+        usb_by_type = {"nvme": 0, "ssd": 0, "hdd": 0}  # USB disks per type
         total_size = 0
         total_used = 0
         smart_ok = 0
@@ -188,45 +188,45 @@ class DisksTab(Vertical):
         bind_mounts = 0
 
         for disk in hierarchy:
-            disk_type = disk.get('type', 'hdd')
+            disk_type = disk.get("type", "hdd")
             if disk_type in type_counts:
                 type_counts[disk_type] += 1
-            if disk.get('is_usb') and disk_type in usb_by_type:
+            if disk.get("is_usb") and disk_type in usb_by_type:
                 usb_by_type[disk_type] += 1
-            total_size += disk.get('size', 0)
+            total_size += disk.get("size", 0)
 
             # SMART status
-            smart_status = disk.get('smart_status', 'N/A')
-            if smart_status == 'OK':
+            smart_status = disk.get("smart_status", "N/A")
+            if smart_status == "OK":
                 smart_ok += 1
-            elif smart_status == 'FAIL':
+            elif smart_status == "FAIL":
                 smart_fail += 1
 
             # Temperature
-            temp = disk.get('temperature')
+            temp = disk.get("temperature")
             if temp is not None:
-                temperatures.append((temp, disk.get('name', '')))
+                temperatures.append((temp, disk.get("name", "")))
 
             # Sum used space from disk usage (aggregated from mounted children)
-            usage = disk.get('usage')
+            usage = disk.get("usage")
             if usage:
-                total_used += usage.get('used', 0)
+                total_used += usage.get("used", 0)
 
             # Check children for high usage warnings and bind mounts
-            for part in disk.get('children', []):
-                part_usage = part.get('usage')
-                if part_usage and part_usage.get('percent', 0) >= 90:
+            for part in disk.get("children", []):
+                part_usage = part.get("usage")
+                if part_usage and part_usage.get("percent", 0) >= 90:
                     warnings.append(f"{part.get('name')} {part_usage['percent']:.0f}%")
                 # Count bind mounts
-                mountpoints = part.get('mountpoints', [])
+                mountpoints = part.get("mountpoints", [])
                 if len(mountpoints) > 1:
                     bind_mounts += len(mountpoints) - 1
                 # Also check LVM children
-                for lvm in part.get('children', []):
-                    lvm_usage = lvm.get('usage')
-                    if lvm_usage and lvm_usage.get('percent', 0) >= 90:
+                for lvm in part.get("children", []):
+                    lvm_usage = lvm.get("usage")
+                    if lvm_usage and lvm_usage.get("percent", 0) >= 90:
                         warnings.append(f"{lvm.get('name')} {lvm_usage['percent']:.0f}%")
-                    lvm_mounts = lvm.get('mountpoints', [])
+                    lvm_mounts = lvm.get("mountpoints", [])
                     if len(lvm_mounts) > 1:
                         bind_mounts += len(lvm_mounts) - 1
 
@@ -234,14 +234,14 @@ class DisksTab(Vertical):
 
         # Build type breakdown string with USB count per type
         type_parts = []
-        if type_counts['nvme'] > 0:
-            usb_suffix = f" [yellow]({usb_by_type['nvme']} USB)[/yellow]" if usb_by_type['nvme'] > 0 else ""
+        if type_counts["nvme"] > 0:
+            usb_suffix = f" [yellow]({usb_by_type['nvme']} USB)[/yellow]" if usb_by_type["nvme"] > 0 else ""
             type_parts.append(f"[cyan]{type_counts['nvme']} NVMe[/cyan]{usb_suffix}")
-        if type_counts['ssd'] > 0:
-            usb_suffix = f" [yellow]({usb_by_type['ssd']} USB)[/yellow]" if usb_by_type['ssd'] > 0 else ""
+        if type_counts["ssd"] > 0:
+            usb_suffix = f" [yellow]({usb_by_type['ssd']} USB)[/yellow]" if usb_by_type["ssd"] > 0 else ""
             type_parts.append(f"[green]{type_counts['ssd']} SSD[/green]{usb_suffix}")
-        if type_counts['hdd'] > 0:
-            usb_suffix = f" [yellow]({usb_by_type['hdd']} USB)[/yellow]" if usb_by_type['hdd'] > 0 else ""
+        if type_counts["hdd"] > 0:
+            usb_suffix = f" [yellow]({usb_by_type['hdd']} USB)[/yellow]" if usb_by_type["hdd"] > 0 else ""
             type_parts.append(f"[blue]{type_counts['hdd']} HDD[/blue]{usb_suffix}")
 
         type_str = ", ".join(type_parts) if type_parts else "none"
@@ -307,21 +307,21 @@ class DisksTab(Vertical):
 
     def _add_disk_row(self, table, disk: Dict[str, Any], io_data: Dict[str, Any] = None) -> None:
         """Add a physical disk row."""
-        name = disk.get('name', '')
-        disk_type = disk.get('type', 'hdd')
-        model = disk.get('model', '')
-        transport = disk.get('transport', '')
-        size = disk.get('size', 0)
-        temp = disk.get('temperature')
-        smart_status = disk.get('smart_status', 'N/A')
-        usage = disk.get('usage')
+        name = disk.get("name", "")
+        disk_type = disk.get("type", "hdd")
+        model = disk.get("model", "")
+        transport = disk.get("transport", "")
+        size = disk.get("size", 0)
+        temp = disk.get("temperature")
+        smart_status = disk.get("smart_status", "N/A")
+        usage = disk.get("usage")
         io_data = io_data or {}
 
-        type_color = DISK_TYPE_COLORS.get(disk_type, 'white')
+        type_color = DISK_TYPE_COLORS.get(disk_type, "white")
         type_label = DISK_TYPE_LABELS.get(disk_type, disk_type.upper())
 
         # Check for problems (SMART fail or high temp)
-        is_problem = smart_status == 'FAIL' or (temp is not None and temp >= 50)
+        is_problem = smart_status == "FAIL" or (temp is not None and temp >= 50)
 
         # Name with model (blink if problematic)
         name_text = Text()
@@ -338,9 +338,9 @@ class DisksTab(Vertical):
         type_text = Text(type_label, style=f"bold {type_color}")
 
         # Connection interface
-        conn_colors = {'usb': 'yellow', 'sata': 'white', 'nvme': 'cyan', 'ata': 'white'}
+        conn_colors = {"usb": "yellow", "sata": "white", "nvme": "cyan", "ata": "white"}
         conn_label = transport.upper() if transport else "-"
-        conn_color = conn_colors.get(transport, 'dim')
+        conn_color = conn_colors.get(transport, "dim")
         conn_text = Text(conn_label, style=conn_color)
 
         # Temperature
@@ -355,16 +355,16 @@ class DisksTab(Vertical):
             temp_text = Text("-", style="dim")
 
         # SMART
-        if smart_status == 'OK':
+        if smart_status == "OK":
             smart_text = Text("✅", style="bold green")
-        elif smart_status == 'FAIL':
+        elif smart_status == "FAIL":
             smart_text = Text("❌", style="bold red blink")
         else:
             smart_text = Text("-", style="dim")
 
         # I/O rate
-        read_rate = io_data.get('read_rate', 0)
-        write_rate = io_data.get('write_rate', 0)
+        read_rate = io_data.get("read_rate", 0)
+        write_rate = io_data.get("write_rate", 0)
         if read_rate > 0 or write_rate > 0:
             # Format as compact string: R:1.2M W:500K
             def fmt_rate(r):
@@ -375,6 +375,7 @@ class DisksTab(Vertical):
                 elif r > 0:
                     return f"{r:.0f}B"
                 return "0"
+
             io_text = Text()
             io_text.append(f"R:{fmt_rate(read_rate)}", style="green")
             io_text.append(" ", style="dim")
@@ -387,9 +388,9 @@ class DisksTab(Vertical):
 
         # Usage stats for disk (aggregated from children)
         if usage:
-            used = usage.get('used', 0)
-            free = usage.get('free', 0)
-            percent = usage.get('percent', 0)
+            used = usage.get("used", 0)
+            free = usage.get("free", 0)
+            percent = usage.get("percent", 0)
 
             used_text = Text(bytes_to_human_readable(used), style=f"bold {type_color}")
             free_text = Text(bytes_to_human_readable(free), style=f"bold {type_color}")
@@ -430,13 +431,13 @@ class DisksTab(Vertical):
 
     def _add_child_row(self, table, node: Dict[str, Any], level: int, is_last: bool, parent_type: str) -> None:
         """Add a partition or LVM child row with tree indentation."""
-        name = node.get('name', '')
-        node_type = node.get('node_type', 'part')
-        size = node.get('size', 0)
-        mountpoints = node.get('mountpoints', [])
-        fstype = node.get('fstype', '')
-        uuid = node.get('uuid', '')
-        usage = node.get('usage')
+        name = node.get("name", "")
+        node_type = node.get("node_type", "part")
+        size = node.get("size", 0)
+        mountpoints = node.get("mountpoints", [])
+        fstype = node.get("fstype", "")
+        uuid = node.get("uuid", "")
+        usage = node.get("usage")
 
         # Tree prefix
         if level == 1:
@@ -445,19 +446,19 @@ class DisksTab(Vertical):
             prefix = "  └─" if is_last else "  ├─"
 
         # Determine color based on node type
-        if node_type == 'lvm':
-            type_color = DISK_TYPE_COLORS['lvm']
-            type_label = 'lvm'
+        if node_type == "lvm":
+            type_color = DISK_TYPE_COLORS["lvm"]
+            type_label = "lvm"
         else:
-            type_color = 'white'
-            type_label = 'part'
+            type_color = "white"
+            type_label = "part"
 
         has_mount = len(mountpoints) > 0
         name_text = Text(f"{prefix}{name}", style="dim" if not has_mount else "")
 
         # Type (part/lvm or fstype if available) with color coding
         if fstype:
-            fstype_color = FSTYPE_COLORS.get(fstype, 'white')
+            fstype_color = FSTYPE_COLORS.get(fstype, "white")
             type_text = Text(fstype, style=fstype_color)
         else:
             type_text = Text(type_label, style=f"{type_color}")
@@ -467,9 +468,9 @@ class DisksTab(Vertical):
 
         # Usage info
         if usage:
-            used = usage.get('used', 0)
-            free = usage.get('free', 0)
-            percent = usage.get('percent', 0)
+            used = usage.get("used", 0)
+            free = usage.get("free", 0)
+            percent = usage.get("percent", 0)
 
             used_text = Text(bytes_to_human_readable(used), style="")
             free_text = Text(bytes_to_human_readable(free), style="")
@@ -493,7 +494,7 @@ class DisksTab(Vertical):
             bar_text = Text("░░░░░░░░░░", style="dim")
 
         # Mountpoint(s) - show all with different colors
-        mount_colors = ['white', 'yellow', 'cyan', 'magenta']
+        mount_colors = ["white", "yellow", "cyan", "magenta"]
         if len(mountpoints) > 1:
             mount_text = Text()
             for i, mp in enumerate(mountpoints):
@@ -544,17 +545,17 @@ class DisksTab(Vertical):
             # Find disk in hierarchy
             target_disk = None
             for disk in self._hierarchy:
-                if disk.get('name') == name_clean:
-                    target_disk = disk.get('full_path')
+                if disk.get("name") == name_clean:
+                    target_disk = disk.get("full_path")
                     break
                 # Check if it's a partition - find parent disk
-                for part in disk.get('children', []):
-                    if part.get('name') == name_clean:
-                        target_disk = disk.get('full_path')
+                for part in disk.get("children", []):
+                    if part.get("name") == name_clean:
+                        target_disk = disk.get("full_path")
                         break
-                    for lvm in part.get('children', []):
-                        if lvm.get('name') == name_clean:
-                            target_disk = disk.get('full_path')
+                    for lvm in part.get("children", []):
+                        if lvm.get("name") == name_clean:
+                            target_disk = disk.get("full_path")
                             break
 
             if target_disk:
@@ -590,22 +591,23 @@ class DisksTab(Vertical):
             target_disk = None
             target_part = None
             for disk in self._hierarchy:
-                if disk.get('name') == name_clean:
+                if disk.get("name") == name_clean:
                     target_disk = disk
                     break
-                for part in disk.get('children', []):
-                    if part.get('name') == name_clean:
+                for part in disk.get("children", []):
+                    if part.get("name") == name_clean:
                         target_disk = disk
                         target_part = part
                         break
-                    for lvm in part.get('children', []):
-                        if lvm.get('name') == name_clean:
+                    for lvm in part.get("children", []):
+                        if lvm.get("name") == name_clean:
                             target_disk = disk
                             target_part = lvm
                             break
 
             if target_disk:
                 from .disk_details_modal import DiskDetailsModal
+
                 self.app.push_screen(DiskDetailsModal(disk=target_disk, partition=target_part))
             else:
                 self.notify("Could not find disk info.", severity="error")
@@ -656,30 +658,32 @@ class DisksTab(Vertical):
             # Find partition in hierarchy
             target_part = None
             for disk in self._hierarchy:
-                if disk.get('name') == name_clean:
+                if disk.get("name") == name_clean:
                     self.notify("Cannot mount/unmount a physical disk.", severity="warning")
                     return
-                for part in disk.get('children', []):
-                    if part.get('name') == name_clean:
+                for part in disk.get("children", []):
+                    if part.get("name") == name_clean:
                         target_part = part
                         break
-                    for lvm in part.get('children', []):
-                        if lvm.get('name') == name_clean:
+                    for lvm in part.get("children", []):
+                        if lvm.get("name") == name_clean:
                             target_part = lvm
                             break
 
             if target_part:
-                mountpoint = target_part.get('mountpoint', '')
-                device = target_part.get('full_path', '')
+                mountpoint = target_part.get("mountpoint", "")
+                device = target_part.get("full_path", "")
 
                 if mountpoint:
                     # Unmount
                     from .mount_modal import MountModal
-                    self.app.push_screen(MountModal(device=device, mountpoint=mountpoint, action='unmount'))
+
+                    self.app.push_screen(MountModal(device=device, mountpoint=mountpoint, action="unmount"))
                 else:
                     # Mount
                     from .mount_modal import MountModal
-                    self.app.push_screen(MountModal(device=device, mountpoint='', action='mount'))
+
+                    self.app.push_screen(MountModal(device=device, mountpoint="", action="mount"))
             else:
                 self.notify("Could not find partition.", severity="error")
 

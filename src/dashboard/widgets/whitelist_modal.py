@@ -59,16 +59,9 @@ class WhitelistModal(ModalScreen[Optional[str]]):
     def compose(self):
         with Vertical(id="whitelist_dialog"):
             yield Label("[bold]Manage IP Whitelist[/bold]", id="whitelist_title")
-            yield ListView(
-                *[ListItem(Label(ip)) for ip in self._whitelist],
-                id="whitelist_list"
-            )
+            yield ListView(*[ListItem(Label(ip)) for ip in self._whitelist], id="whitelist_list")
             with Horizontal(id="whitelist_input_row"):
-                yield Input(
-                    placeholder="Enter IP to whitelist...",
-                    id="whitelist_input",
-                    value=self._selected_ip or ""
-                )
+                yield Input(placeholder="Enter IP to whitelist...", id="whitelist_input", value=self._selected_ip or "")
                 yield Button("Add", id="add_btn", variant="success")
             with Horizontal(id="whitelist_buttons"):
                 yield Button("Remove Selected", id="remove_btn", variant="error")

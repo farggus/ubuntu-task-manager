@@ -92,7 +92,7 @@ class PackagesTab(Vertical):
             char = event.character.upper()
 
             # Ignore keys that are used for bindings
-            if char in ['A', 'U']:
+            if char in ["A", "U"]:
                 return
 
             table = self.query_one(DataTable)
@@ -169,27 +169,27 @@ class PackagesTab(Vertical):
 
     def update_table(self, data: Dict[str, Any]) -> None:
         table = self.query_one(DataTable)
-        pkg_stats = data.get('packages', {})
+        pkg_stats = data.get("packages", {})
 
         if self.show_all:
-            source_list = pkg_stats.get('all_packages', [])
+            source_list = pkg_stats.get("all_packages", [])
         else:
-            source_list = pkg_stats.get('upgradable_list', [])
+            source_list = pkg_stats.get("upgradable_list", [])
 
         def populate(t):
             count_shown = 0
             if not source_list:
-                if not self.show_all and pkg_stats.get('updates', 0) == 0:
+                if not self.show_all and pkg_stats.get("updates", 0) == 0:
                     t.add_row("System is up to date", "", "")
                 else:
                     t.add_row("No packages found", "", "")
             else:
                 for pkg in source_list[:2000]:
-                    name = pkg.get('name', 'N/A')
-                    curr = pkg.get('current_version', '?')
-                    new = pkg.get('new_version', '-')
+                    name = pkg.get("name", "N/A")
+                    curr = pkg.get("current_version", "?")
+                    new = pkg.get("new_version", "-")
 
-                    if pkg.get('upgradable', False) or (not self.show_all):
+                    if pkg.get("upgradable", False) or (not self.show_all):
                         name_styled = Text(name, style="bold yellow")
                         new_styled = Text(new, style="bold green")
                     else:
@@ -199,8 +199,8 @@ class PackagesTab(Vertical):
                     t.add_row(name_styled, curr, new_styled)
                     count_shown += 1
 
-            total = pkg_stats.get('total', 0)
-            updates = pkg_stats.get('updates', 0)
+            total = pkg_stats.get("total", 0)
+            updates = pkg_stats.get("updates", 0)
 
             # Middle section always shows Upgradable Packages info
             upd_color = "red" if updates > 0 else "green"

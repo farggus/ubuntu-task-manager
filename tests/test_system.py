@@ -606,6 +606,13 @@ class TestSmartPersistence(unittest.TestCase):
             os.unlink(DISK_CACHE_FILE)
         self.collector = SystemCollector()
 
+    def tearDown(self):
+        import os
+        from const import DISK_CACHE_FILE
+        # Clean up after each test
+        if os.path.exists(DISK_CACHE_FILE):
+            os.unlink(DISK_CACHE_FILE)
+
     def test_save_creates_file(self):
         """Test that _save_smart_disk_cache creates a file."""
         import os

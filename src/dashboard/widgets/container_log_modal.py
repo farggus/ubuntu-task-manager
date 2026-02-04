@@ -62,10 +62,7 @@ class ContainerLogModal(ModalScreen):
             self.query_one(RichLog).write("[bold red]Docker SDK not installed.[/bold red]")
             return
 
-        self._log_thread = threading.Thread(
-            target=self.stream_logs_thread,
-            daemon=True  # This is the crucial part
-        )
+        self._log_thread = threading.Thread(target=self.stream_logs_thread, daemon=True)  # This is the crucial part
         self._log_thread.start()
 
     def stream_logs_thread(self) -> None:
@@ -76,13 +73,14 @@ class ContainerLogModal(ModalScreen):
             container = client.containers.get(self.container_id)
 
             # Initial logs
-            log_content = container.logs(tail=200).decode('utf-8', errors='ignore')
+            log_content = container.logs(tail=200).decode("utf-8", errors="ignore")
             initial_logs_list = log_content.strip().splitlines()[-50:]
 
             def write_initial():
                 log_view.clear()
                 for line in initial_logs_list:
                     log_view.write(escape(line))
+
             self.app.call_from_thread(write_initial)
 
             # Stream new logs
@@ -90,12 +88,14 @@ class ContainerLogModal(ModalScreen):
             for line in log_stream:
                 if self._stop_event.is_set():
                     break
-                decoded_line = line.decode('utf-8', errors='ignore').strip()
+                decoded_line = line.decode("utf-8", errors="ignore").strip()
                 self.app.call_from_thread(log_view.write, escape(decoded_line))
 
         except NotFound:
             logger.warning(f"Container {self.container_id} not found")
-            self.app.call_from_thread(log_view.write, f"[bold red]Error: Container {self.container_id} not found.[/bold red]")
+            self.app.call_from_thread(
+                log_view.write, f"[bold red]Error: Container {self.container_id} not found.[/bold red]"
+            )
         except Exception as e:
             if not self._stop_event.is_set():
                 logger.error(f"Error streaming logs for container {self.container_id}: {e}")

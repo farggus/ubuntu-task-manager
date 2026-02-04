@@ -71,7 +71,7 @@ class AttacksDatabase:
         with self._lock:
             if self.db_path.exists():
                 try:
-                    with open(self.db_path, 'r', encoding='utf-8') as f:
+                    with open(self.db_path, "r", encoding="utf-8") as f:
                         self._data = json.load(f)
                     logger.debug(f"Loaded database from {self.db_path}")
                 except (json.JSONDecodeError, IOError) as e:
@@ -102,8 +102,8 @@ class AttacksDatabase:
                 self._data["last_updated"] = _now_iso()
 
                 # Atomic write: write to temp file, then rename
-                tmp_path = self.db_path.with_suffix('.tmp')
-                with open(tmp_path, 'w', encoding='utf-8') as f:
+                tmp_path = self.db_path.with_suffix(".tmp")
+                with open(tmp_path, "w", encoding="utf-8") as f:
                     json.dump(self._data, f, indent=2, ensure_ascii=False)
 
                 # Atomic rename (works on POSIX, mostly atomic on Windows)
@@ -123,7 +123,6 @@ class AttacksDatabase:
             "version": self.SCHEMA_VERSION,
             "created_at": _now_iso(),
             "last_updated": _now_iso(),
-
             "stats": {
                 "total_ips": 0,
                 "total_attempts": 0,
@@ -132,18 +131,12 @@ class AttacksDatabase:
                 "threats_count": 0,
                 "evasion_active_count": 0,
                 "top_country": None,
-                "top_org": None
+                "top_org": None,
             },
-
-            "metadata": {
-                "log_positions": {},
-                "last_full_sync": None,
-                "schema_version": self.SCHEMA_VERSION
-            },
-
+            "metadata": {"log_positions": {}, "last_full_sync": None, "schema_version": self.SCHEMA_VERSION},
             "whitelist": [],
             "blacklist": [],
-            "ips": {}
+            "ips": {},
         }
 
     # =========================================================================
@@ -188,7 +181,6 @@ class AttacksDatabase:
             "first_seen": now,
             "last_seen": now,
             "last_updated": _now_unix(),
-
             "geo": {
                 "country": None,
                 "country_code": None,
@@ -199,35 +191,21 @@ class AttacksDatabase:
                 "region": None,
                 "is_vpn": None,
                 "is_datacenter": None,
-                "fetched_at": None
+                "fetched_at": None,
             },
-
-            "attempts": {
-                "total": 0,
-                "by_jail": {},
-                "by_day": {},
-                "first_attempt": None,
-                "last_attempt": None
-            },
-
+            "attempts": {"total": 0, "by_jail": {}, "by_day": {}, "first_attempt": None, "last_attempt": None},
             "bans": {
                 "total": 0,
                 "active": False,
                 "current_jail": None,
                 "current_ban_start": None,
                 "current_ban_duration": None,
-                "history": []
+                "history": [],
             },
-
-            "unbans": {
-                "total": 0,
-                "last": None
-            },
-
+            "unbans": {"total": 0, "last": None},
             "status": "watching",
             "danger_score": 0,
             "tags": [],
-
             "analysis": {
                 "avg_interval": None,
                 "min_interval": None,
@@ -240,12 +218,11 @@ class AttacksDatabase:
                 "evasion_active": False,
                 "threat_detected": False,
                 "fails_before_ban": 0,
-                "last_analysis": None
+                "last_analysis": None,
             },
-
             "user_comment": None,
             "notes": [],
-            "custom": {}
+            "custom": {},
         }
 
     def _deep_merge(self, base: Dict, update: Dict) -> None:
@@ -288,8 +265,9 @@ class AttacksDatabase:
 
             self._dirty = True
 
-    def record_ban(self, ip: str, jail: str, duration: int = 0,
-                   trigger_count: int = 0, timestamp: Optional[str] = None) -> None:
+    def record_ban(
+        self, ip: str, jail: str, duration: int = 0, trigger_count: int = 0, timestamp: Optional[str] = None
+    ) -> None:
         """
         Record a ban event.
 
@@ -318,13 +296,9 @@ class AttacksDatabase:
             record["status"] = "active_ban"
 
             # Add to history
-            record["bans"]["history"].append({
-                "jail": jail,
-                "start": ban_time,
-                "end": None,
-                "duration": duration,
-                "trigger_count": trigger_count
-            })
+            record["bans"]["history"].append(
+                {"jail": jail, "start": ban_time, "end": None, "duration": duration, "trigger_count": trigger_count}
+            )
 
             # Update global stats
             self._data["stats"]["total_bans"] += 1
@@ -373,10 +347,15 @@ class AttacksDatabase:
     # Geo Data
     # =========================================================================
 
-    def set_geo(self, ip: str, country: str, org: str,
-                country_code: Optional[str] = None,
-                asn: Optional[str] = None,
-                city: Optional[str] = None) -> None:
+    def set_geo(
+        self,
+        ip: str,
+        country: str,
+        org: str,
+        country_code: Optional[str] = None,
+        asn: Optional[str] = None,
+        city: Optional[str] = None,
+    ) -> None:
         """
         Set geolocation data for an IP.
 
@@ -400,7 +379,7 @@ class AttacksDatabase:
                 "org": org,
                 "asn": asn,
                 "city": city,
-                "fetched_at": _now_iso()
+                "fetched_at": _now_iso(),
             }
             record["last_updated"] = _now_unix()
             self._dirty = True
@@ -434,12 +413,7 @@ class AttacksDatabase:
                 if entry["ip"] == ip:
                     return
 
-            self._data["whitelist"].append({
-                "ip": ip,
-                "added": _now_iso(),
-                "reason": reason,
-                "added_by": added_by
-            })
+            self._data["whitelist"].append({"ip": ip, "added": _now_iso(), "reason": reason, "added_by": added_by})
 
             # Update IP status if exists
             if ip in self._data["ips"]:
@@ -448,8 +422,9 @@ class AttacksDatabase:
 
             self._dirty = True
 
-    def add_to_blacklist(self, ip: str, reason: str = "",
-                         added_by: str = "system", expires: Optional[str] = None) -> None:
+    def add_to_blacklist(
+        self, ip: str, reason: str = "", added_by: str = "system", expires: Optional[str] = None
+    ) -> None:
         """Add IP to blacklist."""
         with self._lock:
             # Check if already in blacklist
@@ -457,13 +432,9 @@ class AttacksDatabase:
                 if entry["ip"] == ip:
                     return
 
-            self._data["blacklist"].append({
-                "ip": ip,
-                "added": _now_iso(),
-                "reason": reason,
-                "added_by": added_by,
-                "expires": expires
-            })
+            self._data["blacklist"].append(
+                {"ip": ip, "added": _now_iso(), "reason": reason, "added_by": added_by, "expires": expires}
+            )
 
             # Update IP status if exists
             if ip in self._data["ips"]:
@@ -503,21 +474,13 @@ class AttacksDatabase:
     def get_top_threats(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Get IPs sorted by danger score (highest first)."""
         with self._lock:
-            sorted_ips = sorted(
-                self._data["ips"].items(),
-                key=lambda x: x[1].get("danger_score", 0),
-                reverse=True
-            )
+            sorted_ips = sorted(self._data["ips"].items(), key=lambda x: x[1].get("danger_score", 0), reverse=True)
             return [{"ip": ip, **data} for ip, data in sorted_ips[:limit]]
 
     def get_recent_activity(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Get IPs sorted by last_seen (most recent first)."""
         with self._lock:
-            sorted_ips = sorted(
-                self._data["ips"].items(),
-                key=lambda x: x[1].get("last_seen", ""),
-                reverse=True
-            )
+            sorted_ips = sorted(self._data["ips"].items(), key=lambda x: x[1].get("last_seen", ""), reverse=True)
             return [{"ip": ip, **data} for ip, data in sorted_ips[:limit]]
 
     def get_stats(self) -> Dict[str, Any]:
@@ -570,7 +533,7 @@ class AttacksDatabase:
                 "total_bans": total_bans,
                 "active_bans": active_bans,
                 "top_country": max(country_counts, key=country_counts.get) if country_counts else None,
-                "top_org": max(org_counts, key=org_counts.get) if org_counts else None
+                "top_org": max(org_counts, key=org_counts.get) if org_counts else None,
             }
             self._dirty = True
 
@@ -608,7 +571,7 @@ class AttacksDatabase:
             last_seen = record.get("last_seen", "")
             if last_seen:
                 try:
-                    last_seen_dt = datetime.fromisoformat(last_seen.replace('Z', '+00:00'))
+                    last_seen_dt = datetime.fromisoformat(last_seen.replace("Z", "+00:00"))
                     days_ago = (datetime.now(timezone.utc) - last_seen_dt).days
                     if days_ago < 1:
                         score += 20
@@ -642,13 +605,12 @@ class AttacksDatabase:
         with self._lock:
             return self._data["metadata"]["log_positions"].get(log_file)
 
-    def set_log_position(self, log_file: str, position: int,
-                         inode: int = 0, last_line: Optional[str] = None) -> None:
+    def set_log_position(self, log_file: str, position: int, inode: int = 0, last_line: Optional[str] = None) -> None:
         """Save position for a log file."""
         with self._lock:
             self._data["metadata"]["log_positions"][log_file] = {
                 "position": position,
                 "inode": inode,
-                "last_line": last_line
+                "last_line": last_line,
             }
             self._dirty = True

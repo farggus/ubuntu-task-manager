@@ -15,11 +15,13 @@ from pathlib import Path
 _startup_start = time.time()
 _startup_marks = {}
 
+
 def _mark(label: str):
     """Record startup timing mark."""
     elapsed = (time.time() - _startup_start) * 1000
     _startup_marks[label] = elapsed
     print(f"[STARTUP] {label}: {elapsed:.1f}ms", flush=True)
+
 
 _mark("Python start")
 
@@ -59,26 +61,14 @@ def main():
     """Main entry point."""
     _mark("main() start")
 
-    parser = argparse.ArgumentParser(
-        description=f"{APP_NAME} - Monitor your server"
-    )
+    parser = argparse.ArgumentParser(description=f"{APP_NAME} - Monitor your server")
     _mark("ArgumentParser created")
 
     parser.add_argument(
-        '-c', '--config',
-        default=DEFAULT_CONFIG,
-        help=f'Path to configuration file (default: {DEFAULT_CONFIG})'
+        "-c", "--config", default=DEFAULT_CONFIG, help=f"Path to configuration file (default: {DEFAULT_CONFIG})"
     )
-    parser.add_argument(
-        '--version',
-        action='version',
-        version=f'{APP_NAME} {APP_VERSION}'
-    )
-    parser.add_argument(
-        '--debug',
-        action='store_true',
-        help='Enable debug logging'
-    )
+    parser.add_argument("--version", action="version", version=f"{APP_NAME} {APP_VERSION}")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     _mark("Before args.parse_args()")
     args = parser.parse_args()
@@ -106,6 +96,7 @@ def main():
         # Lazy import dashboard - done here instead of module level to avoid blocking startup
         _mark("Before dashboard import in main()")
         from dashboard import UTMDashboard  # noqa: E402
+
         _mark("After dashboard import in main()")
 
         # Time app initialization

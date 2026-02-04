@@ -161,7 +161,7 @@ class CompactSystemInfo(Horizontal):
     def on_mount(self) -> None:
         """Setup UI when mounted (defer data loading to next event cycle)."""
         # Initialize interval display
-        interval = getattr(self.app, 'update_interval', 2000)
+        interval = getattr(self.app, "update_interval", 2000)
         self.border_subtitle = f"[dim]-[/dim] [bold cyan]{interval}[/bold cyan] [dim]+[/dim]"
 
         # Initial fetch of OS info
@@ -196,7 +196,7 @@ class CompactSystemInfo(Horizontal):
         """Fetch OS info once asynchronously."""
         try:
             os_info = self.collector._get_os_info()
-            self.os_name = os_info.get('pretty_name', 'Linux')
+            self.os_name = os_info.get("pretty_name", "Linux")
             # Trigger immediate header update
             self.app.call_from_thread(self.update_header_clock)
         except Exception as e:
@@ -204,12 +204,14 @@ class CompactSystemInfo(Horizontal):
 
     def update_header_clock(self) -> None:
         """Update header with current time and OS info."""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.border_title = f"[dim]^S[/dim] [bold magenta]System Information | {self.os_name} | {timestamp}[/bold magenta]"
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.border_title = (
+            f"[dim]^S[/dim] [bold magenta]System Information | {self.os_name} | {timestamp}[/bold magenta]"
+        )
 
     def update_timer_interval(self, interval_ms: int) -> None:
         """Update the refresh timer with new interval."""
-        if hasattr(self, '_update_timer'):
+        if hasattr(self, "_update_timer"):
             self._update_timer.stop()
 
         # Convert ms to seconds for set_interval
@@ -220,7 +222,7 @@ class CompactSystemInfo(Horizontal):
     def update_data(self) -> None:
         """Update system data in background."""
         data = self.collector.update()
-        if data.get('error'):
+        if data.get("error"):
             self.notify(f"System Info Error: {data['error']}", severity="error")
         self.app.call_from_thread(self.update_ui, data)
 
@@ -253,11 +255,11 @@ class CompactSystemInfo(Horizontal):
             return
 
         try:
-            interval = getattr(self.app, 'update_interval', 2000)
+            interval = getattr(self.app, "update_interval", 2000)
             self.border_subtitle = f"[dim]-[/dim] [bold cyan]{interval}[/bold cyan] [dim]+[/dim]"
 
-            if data_type == 'cpu' and value:
-                cpu_usage = value.get('usage_total', 0)
+            if data_type == "cpu" and value:
+                cpu_usage = value.get("usage_total", 0)
                 self.cpu_history.append(cpu_usage)
                 self.query_one("#cpu_spark", Sparkline).data = list(self.cpu_history)
 
@@ -274,10 +276,10 @@ class CompactSystemInfo(Horizontal):
                     pass
                 self.query_one("#cpu_label", Label).update(cpu_text)
 
-            elif data_type == 'memory' and value:
-                mem_percent = value.get('percent', 0)
-                mem_used_gb = value.get('used', 0) / (1024**3)
-                mem_total_gb = value.get('total', 0) / (1024**3)
+            elif data_type == "memory" and value:
+                mem_percent = value.get("percent", 0)
+                mem_used_gb = value.get("used", 0) / (1024**3)
+                mem_total_gb = value.get("total", 0) / (1024**3)
                 self.mem_history.append(mem_percent)
                 self.query_one("#mem_spark", Sparkline).data = list(self.mem_history)
 
@@ -288,8 +290,8 @@ class CompactSystemInfo(Horizontal):
                 mem_text.append(f"({mem_percent:.0f}%)", style="bold yellow")
                 self.query_one("#mem_percent", Label).update(mem_text)
 
-            elif data_type == 'disk' and value:
-                hierarchy = value.get('hierarchy', [])
+            elif data_type == "disk" and value:
+                hierarchy = value.get("hierarchy", [])
                 self._update_disk_overview(hierarchy)
 
         except Exception as e:
@@ -304,18 +306,20 @@ class CompactSystemInfo(Horizontal):
             total_size = 0
             total_used = 0
             for disk in hierarchy:
-                size = disk.get('size', 0)
+                size = disk.get("size", 0)
                 total_size += size
-                for child in disk.get('children', []):
-                    usage = child.get('usage')
+                for child in disk.get("children", []):
+                    usage = child.get("usage")
                     if usage:
-                        total_used += usage.get('used', 0)
+                        total_used += usage.get("used", 0)
 
             total_size_gb = total_size / (1024**3)
             total_used_gb = total_used / (1024**3)
             percent_used = (total_used / total_size * 100) if total_size > 0 else 0
 
-            disk_text.add_row(Text("Storage ", style="bold cyan"), f"{total_used_gb:.1f}/{total_size_gb:.1f} GB ({percent_used:.0f}%)")
+            disk_text.add_row(
+                Text("Storage ", style="bold cyan"), f"{total_used_gb:.1f}/{total_size_gb:.1f} GB ({percent_used:.0f}%)"
+            )
             basic_info.update(disk_text)
         except Exception as e:
             logger.debug(f"Error updating disk overview: {e}")
@@ -328,13 +332,13 @@ class CompactSystemInfo(Horizontal):
         # Border title is handled by update_header_clock
 
         # Update interval display
-        interval = getattr(self.app, 'update_interval', 2000)
+        interval = getattr(self.app, "update_interval", 2000)
         self.border_subtitle = f"[dim]-[/dim] [bold cyan]{interval}[/bold cyan] [dim]+[/dim]"
 
         # 1. Update Sparklines and Labels
 
         # CPU Load & Load Avg
-        cpu_usage = data.get('cpu', {}).get('usage_total', 0)
+        cpu_usage = data.get("cpu", {}).get("usage_total", 0)
         self.cpu_history.append(cpu_usage)
         self.query_one("#cpu_spark", Sparkline).data = list(self.cpu_history)
 
@@ -354,8 +358,8 @@ class CompactSystemInfo(Horizontal):
         self.query_one("#cpu_label", Label).update(cpu_text)
 
         # Frequency
-        cpu_freq = data.get('cpu', {}).get('frequency', {})
-        current_freq = cpu_freq.get('current', 0)
+        cpu_freq = data.get("cpu", {}).get("frequency", {})
+        current_freq = cpu_freq.get("current", 0)
         self.freq_history.append(current_freq)
         self.query_one("#freq_spark", Sparkline).data = list(self.freq_history)
 
@@ -366,10 +370,10 @@ class CompactSystemInfo(Horizontal):
 
         # Memory
         try:
-            mem_info = data.get('memory', {})
-            mem_percent = mem_info.get('percent', 0)
-            mem_used_gb = mem_info.get('used', 0) / (1024**3)
-            mem_total_gb = mem_info.get('total', 0) / (1024**3)
+            mem_info = data.get("memory", {})
+            mem_percent = mem_info.get("percent", 0)
+            mem_used_gb = mem_info.get("used", 0) / (1024**3)
+            mem_total_gb = mem_info.get("total", 0) / (1024**3)
 
             self.mem_history.append(mem_percent)
             self.query_one("#mem_spark", Sparkline).data = list(self.mem_history)
@@ -390,10 +394,10 @@ class CompactSystemInfo(Horizontal):
 
         # Swap
         try:
-            swap_info = mem_info.get('swap', {})
-            swap_percent = swap_info.get('percent', 0)
-            swap_used_gb = swap_info.get('used', 0) / (1024**3)
-            swap_total_gb = swap_info.get('total', 0) / (1024**3)
+            swap_info = mem_info.get("swap", {})
+            swap_percent = swap_info.get("percent", 0)
+            swap_used_gb = swap_info.get("used", 0) / (1024**3)
+            swap_total_gb = swap_info.get("total", 0) / (1024**3)
 
             self.swap_history.append(swap_percent)
             self.query_one("#swap_spark", Sparkline).data = list(self.swap_history)
@@ -443,12 +447,12 @@ class CompactSystemInfo(Horizontal):
 
     def _render_basic_info(self, data: Dict[str, Any]) -> Table:
         """Render basic system information table."""
-        os_info = data.get('os', {})
-        cpu_info = data.get('cpu', {})
-        uptime_info = data.get('uptime', {})
-        hostname = data.get('hostname', 'N/A')
-        processes_info = data.get('processes', {})
-        network_info = data.get('network', {})
+        os_info = data.get("os", {})
+        cpu_info = data.get("cpu", {})
+        uptime_info = data.get("uptime", {})
+        hostname = data.get("hostname", "N/A")
+        processes_info = data.get("processes", {})
+        network_info = data.get("network", {})
 
         # Compact table, no extra padding
         table = Table(show_header=False, box=None, padding=(0, 1, 0, 1), expand=False)
@@ -456,30 +460,30 @@ class CompactSystemInfo(Horizontal):
         table.add_column("Value", style="white")
 
         table.add_row("Hostname", Text(hostname, style="bold cyan"))
-        table.add_row("IP Address", Text(network_info.get('ip', 'N/A'), style="green"))
+        table.add_row("IP Address", Text(network_info.get("ip", "N/A"), style="green"))
 
         # Display Kernel release
-        table.add_row("Kernel", os_info.get('release', 'N/A'))
+        table.add_row("Kernel", os_info.get("release", "N/A"))
 
         # Formatted Uptime
-        uptime_secs = uptime_info.get('uptime_seconds', 0)
+        uptime_secs = uptime_info.get("uptime_seconds", 0)
         table.add_row("Uptime", self._format_uptime(uptime_secs))
 
         cpu_cores = f"{cpu_info.get('physical_cores', 0)}/{cpu_info.get('total_cores', 0)}"
         table.add_row("Cores (P/T)", cpu_cores)
 
         # Temperature
-        temp = cpu_info.get('temperature', 0)
+        temp = cpu_info.get("temperature", 0)
         temp_style = "red" if temp > 75 else "yellow" if temp > 60 else "green"
         table.add_row("Temperature", Text(f"{temp:.1f}°C", style=temp_style) if temp > 0 else "N/A")
 
         # Users
-        users_count = data.get('users', 0)
+        users_count = data.get("users", 0)
         table.add_row("Users logged in", str(users_count))
 
         # Processes
-        total_procs = processes_info.get('total', 0)
-        zombies = processes_info.get('zombies', 0)
+        total_procs = processes_info.get("total", 0)
+        zombies = processes_info.get("zombies", 0)
 
         proc_text = Text(f"{total_procs}", style="white")
         if zombies > 0:
@@ -487,9 +491,9 @@ class CompactSystemInfo(Horizontal):
         table.add_row("Processes", proc_text)
 
         # Services
-        services_stats = data.get('services_stats', {})
-        active_svc = services_stats.get('active', 0)
-        failed_svc = services_stats.get('failed', 0)
+        services_stats = data.get("services_stats", {})
+        active_svc = services_stats.get("active", 0)
+        failed_svc = services_stats.get("failed", 0)
 
         svc_text = Text(f"{active_svc}", style="white")
         if failed_svc > 0:
@@ -497,9 +501,9 @@ class CompactSystemInfo(Horizontal):
         table.add_row("Services", svc_text)
 
         # Packages
-        pkg_stats = data.get('packages', {})
-        pkg_total = pkg_stats.get('total', 0)
-        pkg_upd = pkg_stats.get('updates', 0)
+        pkg_stats = data.get("packages", {})
+        pkg_total = pkg_stats.get("total", 0)
+        pkg_upd = pkg_stats.get("updates", 0)
 
         pkg_text = Text(f"{pkg_total}", style="white")
         if pkg_upd > 0:
@@ -510,17 +514,17 @@ class CompactSystemInfo(Horizontal):
 
     def _render_disk_info(self, data: Dict[str, Any]) -> Group:
         """Render disk usage information."""
-        disk_info = data.get('disk', {})
-        partitions = disk_info.get('partitions', [])
+        disk_info = data.get("disk", {})
+        partitions = disk_info.get("partitions", [])
 
         # Priority partitions
-        priority_mounts = ['/', '/boot', '/boot/efi', '/home']
+        priority_mounts = ["/", "/boot", "/boot/efi", "/home"]
         main_partitions = []
 
         # Filter and sort by priority
         for mount in priority_mounts:
             for p in partitions:
-                if p.get('mountpoint') == mount:
+                if p.get("mountpoint") == mount:
                     main_partitions.append(p)
                     break
 
@@ -532,10 +536,10 @@ class CompactSystemInfo(Horizontal):
         table.add_column("%", style="bold")
 
         for p in main_partitions:
-            mount = p.get('mountpoint')
-            total = p.get('total', 0) / (1024**3)
-            used = p.get('used', 0) / (1024**3)
-            percent = p.get('percent', 0)
+            mount = p.get("mountpoint")
+            total = p.get("total", 0) / (1024**3)
+            used = p.get("used", 0) / (1024**3)
+            percent = p.get("percent", 0)
 
             style = "green"
             if percent > 90:
@@ -543,19 +547,14 @@ class CompactSystemInfo(Horizontal):
             elif percent > 75:
                 style = "yellow"
 
-            table.add_row(
-                mount,
-                f"{used:.1f}G",
-                f"{total:.1f}G",
-                Text(f"{percent}%", style=style)
-            )
+            table.add_row(mount, f"{used:.1f}G", f"{total:.1f}G", Text(f"{percent}%", style=style))
 
         # Warning section for ANY full disks
         warnings = []
         for p in partitions:
-            if p.get('percent', 0) > 90:
-                mount = p.get('mountpoint')
-                percent = p.get('percent')
+            if p.get("percent", 0) > 90:
+                mount = p.get("mountpoint")
+                percent = p.get("percent")
                 warnings.append(Text(f"⚠  {mount}: {percent}% FULL", style="bold red"))
 
         if warnings:

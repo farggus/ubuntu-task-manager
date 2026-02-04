@@ -20,28 +20,21 @@ def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
     logger.setLevel(level)
 
     # Check environment variables
-    log_format = os.getenv('LOG_FORMAT', 'text').lower()
-    log_dest = os.getenv('LOG_DEST', 'file').lower()
+    log_format = os.getenv("LOG_FORMAT", "text").lower()
+    log_dest = os.getenv("LOG_DEST", "file").lower()
 
-    if log_dest == 'stdout':
+    if log_dest == "stdout":
         handler = logging.StreamHandler(sys.stdout)
     else:
-        handler = RotatingFileHandler(
-            log_file,
-            maxBytes=1 * 1024 * 1024,  # 1 MB
-            backupCount=10,
-            encoding='utf-8'
-        )
+        handler = RotatingFileHandler(log_file, maxBytes=1 * 1024 * 1024, backupCount=10, encoding="utf-8")  # 1 MB
 
     # Import JsonFormatter if available and requested
     json_formatter = None
-    if log_format == 'json':
+    if log_format == "json":
         try:
             from pythonjsonlogger import jsonlogger
-            json_formatter = jsonlogger.JsonFormatter(
-                '%(asctime)s %(levelname)s %(name)s %(message)s',
-                timestamp=True
-            )
+
+            json_formatter = jsonlogger.JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s", timestamp=True)
         except ImportError:
             pass
 
@@ -49,8 +42,7 @@ def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
         formatter = json_formatter
     else:
         formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s - [%(name)s] - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            "%(asctime)s - %(levelname)s - [%(name)s] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
 
     handler.setFormatter(formatter)

@@ -22,9 +22,9 @@ def main():
 
     # Load config
     config = {}
-    config_path = Path('config.yaml')
+    config_path = Path("config.yaml")
     if config_path.exists():
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config = yaml.safe_load(f)
 
     console.print("[bold cyan]Collecting all scheduled tasks...[/bold cyan]\n")
@@ -37,20 +37,20 @@ def main():
         console.print(f"[red]Errors occurred:[/red] {collector.errors}")
 
     # Display Cron Jobs
-    display_cron_jobs(console, data.get('cron', {}))
+    display_cron_jobs(console, data.get("cron", {}))
 
     # Display Systemd Timers
-    display_systemd_timers(console, data.get('systemd_timers', {}))
+    display_systemd_timers(console, data.get("systemd_timers", {}))
 
     # Display Anacron Jobs
-    display_anacron_jobs(console, data.get('anacron', {}))
+    display_anacron_jobs(console, data.get("anacron", {}))
 
 
 def display_cron_jobs(console: Console, cron_data: dict):
     """Display all cron jobs in detail."""
-    all_jobs = cron_data.get('all_jobs', [])
-    total = cron_data.get('total', 0)
-    by_source = cron_data.get('by_source', {})
+    all_jobs = cron_data.get("all_jobs", [])
+    total = cron_data.get("total", 0)
+    by_source = cron_data.get("by_source", {})
 
     if total == 0:
         console.print("[yellow]No cron jobs found[/yellow]\n")
@@ -76,21 +76,21 @@ def display_cron_jobs(console: Console, cron_data: dict):
     table.add_column("Command", style="white")
 
     for job in all_jobs:
-        user = job.get('user', 'unknown')
-        source = job.get('source', 'unknown')
+        user = job.get("user", "unknown")
+        source = job.get("source", "unknown")
 
-        schedule_info = job.get('schedule', {})
-        schedule_human = schedule_info.get('human', 'N/A')
+        schedule_info = job.get("schedule", {})
+        schedule_human = schedule_info.get("human", "N/A")
 
-        next_run = job.get('next_run', 'N/A')
-        next_run_human = job.get('next_run_human', 'N/A')
+        next_run = job.get("next_run", "N/A")
+        next_run_human = job.get("next_run_human", "N/A")
         next_run_display = f"{next_run}\n{next_run_human}"
 
-        command = job.get('command', '')
+        command = job.get("command", "")
 
         # Truncate command if very long
         if len(command) > 80:
-            command = command[:77] + '...'
+            command = command[:77] + "..."
 
         table.add_row(user, source, schedule_human, next_run_display, command)
 
@@ -100,14 +100,14 @@ def display_cron_jobs(console: Console, cron_data: dict):
 
 def display_systemd_timers(console: Console, timers_data: dict):
     """Display systemd timers in detail."""
-    if timers_data.get('error'):
+    if timers_data.get("error"):
         console.print(f"[red]Systemd timers error:[/red] {timers_data['error']}\n")
         return
 
-    timers = timers_data.get('timers', [])
-    total = timers_data.get('total', 0)
-    enabled = timers_data.get('enabled', 0)
-    active = timers_data.get('active', 0)
+    timers = timers_data.get("timers", [])
+    total = timers_data.get("total", 0)
+    enabled = timers_data.get("enabled", 0)
+    active = timers_data.get("active", 0)
 
     if total == 0:
         console.print("[yellow]No systemd timers found[/yellow]\n")
@@ -131,25 +131,25 @@ def display_systemd_timers(console: Console, timers_data: dict):
     table.add_column("Last", style="dim", width=15)
 
     for timer in timers:
-        name = timer.get('name', 'unknown')
-        state = timer.get('state', 'unknown')
+        name = timer.get("name", "unknown")
+        state = timer.get("state", "unknown")
 
         # Color code state
-        if 'enabled' in state:
+        if "enabled" in state:
             state_display = f"[green]{state}[/green]"
-        elif 'disabled' in state:
+        elif "disabled" in state:
             state_display = f"[red]{state}[/red]"
         else:
             state_display = state
 
-        triggers = timer.get('triggers', 'unknown')
+        triggers = timer.get("triggers", "unknown")
         if len(triggers) > 25:
-            triggers = triggers[:22] + '...'
+            triggers = triggers[:22] + "..."
 
-        next_run = timer.get('left', 'n/a')
-        last = timer.get('last_trigger', 'never')
-        if last == 'never' or not last:
-            last = 'never'
+        next_run = timer.get("left", "n/a")
+        last = timer.get("last_trigger", "never")
+        if last == "never" or not last:
+            last = "never"
 
         table.add_row(name, state_display, triggers, next_run, last)
 
@@ -159,18 +159,18 @@ def display_systemd_timers(console: Console, timers_data: dict):
 
 def display_anacron_jobs(console: Console, anacron_data: dict):
     """Display anacron jobs in detail."""
-    status = anacron_data.get('status', 'not_installed')
+    status = anacron_data.get("status", "not_installed")
 
-    if status == 'not_installed':
+    if status == "not_installed":
         console.print("[dim]Anacron not installed[/dim]\n")
         return
 
-    if anacron_data.get('error'):
+    if anacron_data.get("error"):
         console.print(f"[red]Anacron error:[/red] {anacron_data['error']}\n")
         return
 
-    jobs = anacron_data.get('jobs', [])
-    count = anacron_data.get('count', 0)
+    jobs = anacron_data.get("jobs", [])
+    count = anacron_data.get("count", 0)
 
     if count == 0:
         console.print("[yellow]No anacron jobs configured[/yellow]\n")
@@ -191,13 +191,13 @@ def display_anacron_jobs(console: Console, anacron_data: dict):
     table.add_column("Command", style="white")
 
     for job in jobs:
-        period = job.get('period_human', job.get('period', 'unknown'))
-        delay = job.get('delay', 'N/A')
-        job_id = job.get('job_id', 'unknown')
-        command = job.get('command', '')
+        period = job.get("period_human", job.get("period", "unknown"))
+        delay = job.get("delay", "N/A")
+        job_id = job.get("job_id", "unknown")
+        command = job.get("command", "")
 
         if len(command) > 60:
-            command = command[:57] + '...'
+            command = command[:57] + "..."
 
         table.add_row(period, delay, job_id, command)
 

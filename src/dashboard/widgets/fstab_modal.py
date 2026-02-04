@@ -79,7 +79,9 @@ class FstabModal(ModalScreen):
             self.app.call_from_thread(self._set_content, content)
         except PermissionError:
             logger.warning("Permission denied reading /etc/fstab")
-            self.app.call_from_thread(self._set_content, "# Error: Permission denied reading /etc/fstab\n# Run dashboard with sudo")
+            self.app.call_from_thread(
+                self._set_content, "# Error: Permission denied reading /etc/fstab\n# Run dashboard with sudo"
+            )
         except Exception as e:
             logger.error(f"Error loading /etc/fstab: {e}")
             self.app.call_from_thread(self._set_content, f"# Error loading /etc/fstab: {e}")
@@ -135,23 +137,21 @@ class FstabModal(ModalScreen):
                 self.app.call_from_thread(self.dismiss)
             else:
                 # Need sudo - use temp file
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.fstab', delete=False) as tmp:
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".fstab", delete=False) as tmp:
                     tmp.write(content)
                     tmp_path = tmp.name
 
                 try:
                     # Backup original
                     result = subprocess.run(
-                        [SUDO, CP, '/etc/fstab', backup_path],
-                        capture_output=True, text=True, timeout=10
+                        [SUDO, CP, "/etc/fstab", backup_path], capture_output=True, text=True, timeout=10
                     )
                     if result.returncode != 0:
                         raise Exception(f"Backup failed: {result.stderr}")
 
                     # Copy new content
                     result = subprocess.run(
-                        [SUDO, CP, tmp_path, '/etc/fstab'],
-                        capture_output=True, text=True, timeout=10
+                        [SUDO, CP, tmp_path, "/etc/fstab"], capture_output=True, text=True, timeout=10
                     )
                     if result.returncode != 0:
                         raise Exception(f"Save failed: {result.stderr}")
@@ -167,10 +167,10 @@ class FstabModal(ModalScreen):
 
     def validate_fstab(self, content: str) -> bool:
         """Basic validation of fstab content."""
-        lines = content.strip().split('\n')
+        lines = content.strip().split("\n")
         for i, line in enumerate(lines, 1):
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
             parts = line.split()
             if len(parts) < 4:

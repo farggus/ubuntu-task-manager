@@ -62,16 +62,19 @@ This may take a moment.[/dim]""")
         log_view = self.query_one(RichLog)
 
         # Check if smartctl is installed
-        if subprocess.run([WHICH, 'smartctl'], capture_output=True).returncode != 0:
-            self.app.call_from_thread(log_view.write, "[bold red]Error: `smartctl` command not found. Please install `smartmontools`.[/bold red]")
+        if subprocess.run([WHICH, "smartctl"], capture_output=True).returncode != 0:
+            self.app.call_from_thread(
+                log_view.write,
+                "[bold red]Error: `smartctl` command not found. Please install `smartmontools`.[/bold red]",
+            )
             return
 
         # Try different device types for USB devices
-        device_types = [None, 'sat', 'usbsunplus', 'usbjmicron', 'usbcypress']
+        device_types = [None, "sat", "usbsunplus", "usbjmicron", "usbcypress"]
 
         for dev_type in device_types:
             result = self._try_smartctl(dev_type)
-            if result and result.stdout and 'specify device type' not in result.stdout.lower():
+            if result and result.stdout and "specify device type" not in result.stdout.lower():
                 # Success - got valid output
                 self.app.call_from_thread(log_view.clear)
                 self.app.call_from_thread(log_view.write, escape(result.stdout))
@@ -81,8 +84,13 @@ This may take a moment.[/dim]""")
 
         # All device types failed
         self.app.call_from_thread(log_view.clear)
-        self.app.call_from_thread(log_view.write, f"[bold red]Could not read SMART data for {self.disk_device}[/bold red]\n")
-        self.app.call_from_thread(log_view.write, "[dim]This may be a USB device that doesn't support SMART passthrough, or the disk doesn't support SMART.[/dim]")
+        self.app.call_from_thread(
+            log_view.write, f"[bold red]Could not read SMART data for {self.disk_device}[/bold red]\n"
+        )
+        self.app.call_from_thread(
+            log_view.write,
+            "[dim]This may be a USB device that doesn't support SMART passthrough, or the disk doesn't support SMART.[/dim]",
+        )
 
     def _try_smartctl(self, device_type: str = None) -> subprocess.CompletedProcess:
         """Try to run smartctl with optional device type."""
@@ -97,12 +105,7 @@ This may take a moment.[/dim]""")
 
             cmd.append(self.disk_device)
 
-            return subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            return subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         except subprocess.TimeoutExpired:
             logger.warning(f"SMART query timed out for {self.disk_device}")
             return None

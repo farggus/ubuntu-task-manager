@@ -10,12 +10,12 @@ from .tasks import TasksCollector
 from .users import UsersCollector
 
 __all__ = [
-    'BaseCollector',
-    'Fail2banCollector',
-    'NetworkCollector',
-    'ProcessesCollector',
-    'ServicesCollector',
-    'SystemCollector',
-    'TasksCollector',
-    'UsersCollector',
+    "BaseCollector",
+    "Fail2banCollector",
+    "NetworkCollector",
+    "ProcessesCollector",
+    "ServicesCollector",
+    "SystemCollector",
+    "TasksCollector",
+    "UsersCollector",
 ]

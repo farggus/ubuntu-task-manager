@@ -22,22 +22,22 @@ AUTH_LOG = Path("/var/log/auth.log")
 # Regex patterns for fail2ban log parsing
 PATTERNS = {
     # 2024-01-15 10:23:45,123 fail2ban.actions [12345]: NOTICE [sshd] Ban 192.168.1.1
-    'ban': re.compile(
-        r'(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}),\d+\s+'
-        r'fail2ban\.\w+\s+\[\d+\]:\s+\w+\s+'
-        r'\[(?P<jail>[^\]]+)\]\s+Ban\s+(?P<ip>\S+)'
+    "ban": re.compile(
+        r"(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}),\d+\s+"
+        r"fail2ban\.\w+\s+\[\d+\]:\s+\w+\s+"
+        r"\[(?P<jail>[^\]]+)\]\s+Ban\s+(?P<ip>\S+)"
     ),
     # 2024-01-15 10:23:45,123 fail2ban.actions [12345]: NOTICE [sshd] Unban 192.168.1.1
-    'unban': re.compile(
-        r'(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}),\d+\s+'
-        r'fail2ban\.\w+\s+\[\d+\]:\s+\w+\s+'
-        r'\[(?P<jail>[^\]]+)\]\s+Unban\s+(?P<ip>\S+)'
+    "unban": re.compile(
+        r"(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}),\d+\s+"
+        r"fail2ban\.\w+\s+\[\d+\]:\s+\w+\s+"
+        r"\[(?P<jail>[^\]]+)\]\s+Unban\s+(?P<ip>\S+)"
     ),
     # 2024-01-15 10:23:45,123 fail2ban.filter [12345]: INFO [sshd] Found 192.168.1.1
-    'found': re.compile(
-        r'(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}),\d+\s+'
-        r'fail2ban\.filter\s+\[\d+\]:\s+INFO\s+'
-        r'\[(?P<jail>[^\]]+)\]\s+Found\s+(?P<ip>\S+)'
+    "found": re.compile(
+        r"(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}),\d+\s+"
+        r"fail2ban\.filter\s+\[\d+\]:\s+INFO\s+"
+        r"\[(?P<jail>[^\]]+)\]\s+Found\s+(?P<ip>\S+)"
     ),
 }
 
@@ -79,34 +79,34 @@ class Fail2banV2Collector(BaseCollector):
         logger.debug("Starting Fail2Ban v2 collection")
 
         result = {
-            'success': False,
-            'bans_found': 0,
-            'unbans_found': 0,
-            'attempts_found': 0,
-            'new_ips': 0,
-            'parse_time': 0,
-            'logs_parsed': [],
+            "success": False,
+            "bans_found": 0,
+            "unbans_found": 0,
+            "attempts_found": 0,
+            "new_ips": 0,
+            "parse_time": 0,
+            "logs_parsed": [],
         }
 
         try:
             # Parse fail2ban logs
             stats = self._parse_fail2ban_logs()
 
-            result['bans_found'] = stats.get('bans', 0)
-            result['unbans_found'] = stats.get('unbans', 0)
-            result['attempts_found'] = stats.get('attempts', 0)
-            result['new_ips'] = stats.get('new_ips', 0)
-            result['logs_parsed'] = stats.get('logs_parsed', [])
-            result['success'] = True
+            result["bans_found"] = stats.get("bans", 0)
+            result["unbans_found"] = stats.get("unbans", 0)
+            result["attempts_found"] = stats.get("attempts", 0)
+            result["new_ips"] = stats.get("new_ips", 0)
+            result["logs_parsed"] = stats.get("logs_parsed", [])
+            result["success"] = True
 
             # Sync active bans with fail2ban-client (real-time state)
             sync_stats = self._sync_with_fail2ban()
-            result['synced_active'] = sync_stats.get('synced', 0)
+            result["synced_active"] = sync_stats.get("synced", 0)
 
             # Save database
             self._db.save()
 
-            result['parse_time'] = time.time() - t0
+            result["parse_time"] = time.time() - t0
             logger.info(
                 f"Fail2Ban v2 collection completed: "
                 f"{result['bans_found']} bans, {result['unbans_found']} unbans, "
@@ -115,7 +115,7 @@ class Fail2banV2Collector(BaseCollector):
 
         except Exception as e:
             logger.error(f"Error in Fail2Ban v2 collection: {e}")
-            result['error'] = str(e)
+            result["error"] = str(e)
 
         return result
 
@@ -127,11 +127,11 @@ class Fail2banV2Collector(BaseCollector):
             Dict with counts of parsed events
         """
         stats = {
-            'bans': 0,
-            'unbans': 0,
-            'attempts': 0,
-            'new_ips': 0,
-            'logs_parsed': [],
+            "bans": 0,
+            "unbans": 0,
+            "attempts": 0,
+            "new_ips": 0,
+            "logs_parsed": [],
         }
 
         # Get all fail2ban log files
@@ -143,11 +143,11 @@ class Fail2banV2Collector(BaseCollector):
         for log_file in log_files:
             try:
                 file_stats = self._parse_single_log(log_file)
-                stats['bans'] += file_stats.get('bans', 0)
-                stats['unbans'] += file_stats.get('unbans', 0)
-                stats['attempts'] += file_stats.get('attempts', 0)
-                stats['new_ips'] += file_stats.get('new_ips', 0)
-                stats['logs_parsed'].append(str(log_file))
+                stats["bans"] += file_stats.get("bans", 0)
+                stats["unbans"] += file_stats.get("unbans", 0)
+                stats["attempts"] += file_stats.get("attempts", 0)
+                stats["new_ips"] += file_stats.get("new_ips", 0)
+                stats["logs_parsed"].append(str(log_file))
             except Exception as e:
                 logger.error(f"Error parsing {log_file}: {e}")
 
@@ -167,11 +167,11 @@ class Fail2banV2Collector(BaseCollector):
         # fail2ban.log.2.gz, fail2ban.log.1, fail2ban.log
         def sort_key(p: Path) -> Tuple[int, str]:
             name = p.name
-            if name == 'fail2ban.log':
-                return (0, '')  # Current log last
+            if name == "fail2ban.log":
+                return (0, "")  # Current log last
             # Extract rotation number if present
             try:
-                num = int(name.replace('fail2ban.log.', '').replace('.gz', ''))
+                num = int(name.replace("fail2ban.log.", "").replace(".gz", ""))
                 return (1, -num)  # Higher numbers first (older)
             except ValueError:
                 return (1, name)
@@ -188,24 +188,24 @@ class Fail2banV2Collector(BaseCollector):
         Returns:
             Dict with counts of parsed events
         """
-        stats = {'bans': 0, 'unbans': 0, 'attempts': 0, 'new_ips': 0}
+        stats = {"bans": 0, "unbans": 0, "attempts": 0, "new_ips": 0}
         log_key = str(log_path)
 
         # Get last known position (extract from dict if present)
         pos_data = self._db.get_log_position(log_key)
-        last_position = pos_data.get('position', 0) if pos_data else 0
+        last_position = pos_data.get("position", 0) if pos_data else 0
         current_position = 0
 
         # Open file (handle gzip)
-        opener = gzip.open if log_path.suffix == '.gz' else open
+        opener = gzip.open if log_path.suffix == ".gz" else open
 
         try:
-            with opener(log_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            with opener(log_path, "rt", encoding="utf-8", errors="ignore") as f:
                 for line_num, line in enumerate(f, 1):
                     current_position = line_num
 
                     # Skip already processed lines (for current log only)
-                    if not log_path.name.endswith('.gz') and line_num <= last_position:
+                    if not log_path.name.endswith(".gz") and line_num <= last_position:
                         continue
 
                     # Try to match patterns
@@ -214,7 +214,7 @@ class Fail2banV2Collector(BaseCollector):
                         self._process_event(event, stats)
 
             # Update position for current log (not rotated)
-            if not log_path.name.endswith('.gz'):
+            if not log_path.name.endswith(".gz"):
                 self._db.set_log_position(log_key, current_position)
 
         except Exception as e:
@@ -241,14 +241,14 @@ class Fail2banV2Collector(BaseCollector):
             match = pattern.match(line)
             if match:
                 data = match.groupdict()
-                data['type'] = event_type
+                data["type"] = event_type
 
                 # Parse timestamp
                 try:
-                    dt = datetime.strptime(data['timestamp'], '%Y-%m-%d %H:%M:%S')
-                    data['datetime'] = dt.replace(tzinfo=timezone.utc)
+                    dt = datetime.strptime(data["timestamp"], "%Y-%m-%d %H:%M:%S")
+                    data["datetime"] = dt.replace(tzinfo=timezone.utc)
                 except ValueError:
-                    data['datetime'] = None
+                    data["datetime"] = None
 
                 return data
 
@@ -262,10 +262,10 @@ class Fail2banV2Collector(BaseCollector):
             event: Parsed event data
             stats: Stats dict to update
         """
-        ip = event.get('ip')
-        jail = event.get('jail', 'unknown')
-        event_type = event.get('type')
-        timestamp = event.get('datetime')
+        ip = event.get("ip")
+        jail = event.get("jail", "unknown")
+        event_type = event.get("type")
+        timestamp = event.get("datetime")
 
         if not ip:
             return
@@ -273,22 +273,22 @@ class Fail2banV2Collector(BaseCollector):
         # Check if IP is new
         existing = self._db.get_ip(ip)
         if not existing:
-            stats['new_ips'] += 1
+            stats["new_ips"] += 1
 
-        if event_type == 'ban':
+        if event_type == "ban":
             # Get jail bantime (default 600s for unknown)
             duration = self._get_jail_bantime(jail)
             self._db.record_ban(ip, jail, duration=duration)
-            stats['bans'] += 1
+            stats["bans"] += 1
             # Note: individual event logging removed for performance (summary logged in collect())
 
-        elif event_type == 'unban':
+        elif event_type == "unban":
             self._db.record_unban(ip, jail)
-            stats['unbans'] += 1
+            stats["unbans"] += 1
 
-        elif event_type == 'found':
+        elif event_type == "found":
             self._db.record_attempt(ip, jail)
-            stats['attempts'] += 1
+            stats["attempts"] += 1
 
     def _get_jail_bantime(self, jail: str) -> int:
         """
@@ -302,10 +302,10 @@ class Fail2banV2Collector(BaseCollector):
         """
         # Known bantimes
         bantimes = {
-            'recidive': 604800,  # 7 days
-            'sshd': 600,         # 10 minutes
-            'traefik-auth': 3600,
-            'traefik-botsearch': 86400,
+            "recidive": 604800,  # 7 days
+            "sshd": 600,  # 10 minutes
+            "traefik-auth": 3600,
+            "traefik-botsearch": 86400,
         }
         return bantimes.get(jail, 600)  # Default 10 min
 
@@ -321,18 +321,18 @@ class Fail2banV2Collector(BaseCollector):
         top_threats = self._db.get_top_threats(limit=10)
 
         return {
-            'total_ips': stats.get('total_ips', 0),
-            'total_attempts': stats.get('total_attempts', 0),
-            'total_bans': stats.get('total_bans', 0),
-            'active_bans': len(active_bans),
-            'top_country': stats.get('top_country'),
-            'top_org': stats.get('top_org'),
-            'top_threats': [
+            "total_ips": stats.get("total_ips", 0),
+            "total_attempts": stats.get("total_attempts", 0),
+            "total_bans": stats.get("total_bans", 0),
+            "active_bans": len(active_bans),
+            "top_country": stats.get("top_country"),
+            "top_org": stats.get("top_org"),
+            "top_threats": [
                 {
-                    'ip': ip,
-                    'danger_score': data.get('danger_score', 0),
-                    'attempts': data.get('attempts', {}).get('total', 0),
-                    'bans': data.get('bans', {}).get('total', 0),
+                    "ip": ip,
+                    "danger_score": data.get("danger_score", 0),
+                    "attempts": data.get("attempts", {}).get("total", 0),
+                    "bans": data.get("bans", {}).get("total", 0),
                 }
                 for ip, data in top_threats
             ],
@@ -350,7 +350,7 @@ class Fail2banV2Collector(BaseCollector):
         """
         if reset_positions:
             # Clear log positions to force full re-parse
-            self._db._data['metadata']['log_positions'] = {}
+            self._db._data["metadata"]["log_positions"] = {}
 
         stats = self._parse_fail2ban_logs()
         self._db.recalculate_stats()
@@ -370,7 +370,7 @@ class Fail2banV2Collector(BaseCollector):
         """
         from collectors.fail2ban_client import Fail2banClient
 
-        stats = {'synced': 0, 'activated': 0, 'deactivated': 0}
+        stats = {"synced": 0, "activated": 0, "deactivated": 0}
 
         try:
             client = Fail2banClient()
@@ -389,29 +389,29 @@ class Fail2banV2Collector(BaseCollector):
             # Update database
             all_db_ips = self._db.get_all_ips()
             for ip, data in all_db_ips.items():
-                bans = data.get('bans', {})
-                is_active_in_db = bans.get('active', False)
+                bans = data.get("bans", {})
+                is_active_in_db = bans.get("active", False)
                 is_active_real = ip in all_banned
 
                 if is_active_in_db != is_active_real:
                     # Need to update
                     if is_active_real:
                         # Mark as active
-                        self._db._data['ips'][ip]['bans']['active'] = True
-                        stats['activated'] += 1
+                        self._db._data["ips"][ip]["bans"]["active"] = True
+                        stats["activated"] += 1
                     else:
                         # Mark as inactive
-                        self._db._data['ips'][ip]['bans']['active'] = False
-                        stats['deactivated'] += 1
-                    stats['synced'] += 1
+                        self._db._data["ips"][ip]["bans"]["active"] = False
+                        stats["deactivated"] += 1
+                    stats["synced"] += 1
 
             # Also add any banned IPs not in DB yet
             for ip in all_banned:
                 if ip not in all_db_ips:
-                    self._db._data['ips'][ip] = self._db._create_empty_ip_record()
-                    self._db._data['ips'][ip]['bans']['active'] = True
-                    stats['synced'] += 1
-                    stats['activated'] += 1
+                    self._db._data["ips"][ip] = self._db._create_empty_ip_record()
+                    self._db._data["ips"][ip]["bans"]["active"] = True
+                    stats["synced"] += 1
+                    stats["activated"] += 1
 
             self._db._dirty = True
             logger.info(f"Synced active bans: {stats['activated']} activated, {stats['deactivated']} deactivated")
@@ -420,4 +420,3 @@ class Fail2banV2Collector(BaseCollector):
             logger.error(f"Failed to sync with fail2ban: {e}")
 
         return stats
-

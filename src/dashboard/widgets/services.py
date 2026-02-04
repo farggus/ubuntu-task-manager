@@ -105,7 +105,7 @@ class ServicesTab(Vertical):
     @work(thread=True)
     def run_service_command(self, service_name: str, action: str) -> None:
         """Run systemctl command in background."""
-        if any(c in service_name for c in ';|&'):
+        if any(c in service_name for c in ";|&"):
             msg = f"Invalid service name: {service_name}"
             logger.warning(f"Security alert: {msg}")
             self.app.call_from_thread(self.notify, msg, severity="error")
@@ -117,7 +117,9 @@ class ServicesTab(Vertical):
 
             if result.returncode == 0:
                 logger.info(f"Successfully {action}ed service: {service_name}")
-                self.app.call_from_thread(self.notify, f"Successfully {action}ed {service_name}", severity="information")
+                self.app.call_from_thread(
+                    self.notify, f"Successfully {action}ed {service_name}", severity="information"
+                )
                 self.update_data()
             else:
                 err_msg = result.stderr.strip() or "Unknown error"
@@ -131,7 +133,7 @@ class ServicesTab(Vertical):
     def update_data(self) -> None:
         """Update services data in background."""
         data = self.collector.update()
-        if data.get('error'):
+        if data.get("error"):
             self.notify(f"Services Data Error: {data['error']}", severity="error")
         self.app.call_from_thread(self.update_table, data)
 
@@ -139,40 +141,40 @@ class ServicesTab(Vertical):
         """Update table on main thread."""
         table = self.query_one(DataTable)
 
-        systemd_data = data.get('systemd', {})
-        services = systemd_data.get('services', [])
+        systemd_data = data.get("systemd", {})
+        services = systemd_data.get("services", [])
 
         # Sort logic
         def sort_key(s):
-            state = s.get('state', '').lower()
-            active = s.get('active', '').lower()
-            if state == 'running':
+            state = s.get("state", "").lower()
+            active = s.get("active", "").lower()
+            if state == "running":
                 priority = 0
-            elif state == 'failed' or active == 'failed':
+            elif state == "failed" or active == "failed":
                 priority = 1
-            elif active == 'active':
+            elif active == "active":
                 priority = 2
             else:
                 priority = 3
-            return (priority, s.get('name', '').lower())
+            return (priority, s.get("name", "").lower())
 
         services.sort(key=sort_key)
 
         def populate(t):
             for service in services[:500]:
-                name = service.get('name', 'N/A')
-                user = service.get('user', '')
-                state = service.get('state', service.get('active', 'unknown'))
-                sub_state = service.get('sub_state', service.get('sub', '-'))
-                description = service.get('description', '')
+                name = service.get("name", "N/A")
+                user = service.get("user", "")
+                state = service.get("state", service.get("active", "unknown"))
+                sub_state = service.get("sub_state", service.get("sub", "-"))
+                description = service.get("description", "")
 
-                if state == 'running' or state == 'active':
+                if state == "running" or state == "active":
                     state_styled = Text(state, style="green")
-                elif state == 'exited' or state == 'failed':
+                elif state == "exited" or state == "failed":
                     state_styled = Text(state, style="red")
-                elif state == 'dead':
+                elif state == "dead":
                     state_styled = Text(state, style="yellow")
-                elif state == 'inactive':
+                elif state == "inactive":
                     state_styled = Text(state, style="dim")
                 else:
                     state_styled = Text(state, style="white")
@@ -182,10 +184,10 @@ class ServicesTab(Vertical):
         update_table_preserving_scroll(table, populate)
 
         # Update Header
-        total = systemd_data.get('total', 0)
-        active = systemd_data.get('active', 0)
-        running = systemd_data.get('running', 0)
-        failed = systemd_data.get('failed', 0)
+        total = systemd_data.get("total", 0)
+        active = systemd_data.get("active", 0)
+        running = systemd_data.get("running", 0)
+        failed = systemd_data.get("failed", 0)
 
         fail_color = "red" if failed > 0 else "green"
 

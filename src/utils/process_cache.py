@@ -66,15 +66,12 @@ def get_process_stats() -> Dict[str, int]:
     Returns:
         Dictionary with 'total' and 'zombies' counts.
     """
-    processes = get_process_list(['status'])
+    processes = get_process_list(["status"])
 
     total = len(processes)
-    zombies = sum(
-        1 for p in processes
-        if p.get('status') == psutil.STATUS_ZOMBIE
-    )
+    zombies = sum(1 for p in processes if p.get("status") == psutil.STATUS_ZOMBIE)
 
-    return {'total': total, 'zombies': zombies}
+    return {"total": total, "zombies": zombies}
 
 
 def invalidate_cache() -> None:

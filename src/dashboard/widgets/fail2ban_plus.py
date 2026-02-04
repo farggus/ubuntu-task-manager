@@ -90,6 +90,7 @@ class Fail2banPlusTab(Vertical, can_focus=True):
     def action_open_db_modal(self) -> None:
         """Open the F2B Database Manager modal."""
         from dashboard.widgets.f2b_db_manage_modal import F2BDatabaseModal
+
         self.app.push_screen(F2BDatabaseModal())
 
     def action_update_data_manual(self) -> None:
@@ -107,6 +108,7 @@ class Fail2banPlusTab(Vertical, can_focus=True):
 
             # Auto-parse logs to populate/update database
             from collectors.fail2ban_v2 import Fail2banV2Collector
+
             collector = Fail2banV2Collector(db=self._db)
             parse_stats = collector.collect()
             logger.info(f"Auto-parsed logs: {parse_stats}")
@@ -160,17 +162,17 @@ class Fail2banPlusTab(Vertical, can_focus=True):
 
                 for ip, data in all_ips.items():
                     # Unbanned = IPs with bans.total > 0 but not currently active
-                    bans = data.get('bans', {})
-                    if bans.get('total', 0) > 0 and not bans.get('active'):
+                    bans = data.get("bans", {})
+                    if bans.get("total", 0) > 0 and not bans.get("active"):
                         unbanned_count += 1
 
                     # Threats = threat_detected or evasion_active
-                    analysis = data.get('analysis', {})
-                    if analysis.get('threat_detected') or analysis.get('evasion_detected'):
+                    analysis = data.get("analysis", {})
+                    if analysis.get("threat_detected") or analysis.get("evasion_detected"):
                         threats_count += 1
 
                     # Currently evading
-                    if analysis.get('evasion_active'):
+                    if analysis.get("evasion_active"):
                         evasion_count += 1
 
                 logger.debug(f"Calculated: unbanned={unbanned_count}, threats={threats_count}, evasion={evasion_count}")

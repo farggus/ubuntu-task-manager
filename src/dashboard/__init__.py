@@ -2,4 +2,4 @@
 
 from .app import UTMDashboard
 
-__all__ = ['UTMDashboard']
+__all__ = ["UTMDashboard"]

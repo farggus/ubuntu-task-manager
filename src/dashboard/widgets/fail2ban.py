@@ -39,6 +39,7 @@ VIRTUAL_JAILS = (SECTION_HISTORY, SECTION_SLOW_DETECTOR)
 
 class SubTab(Enum):
     """Sub-tab types for Fail2ban view."""
+
     ACTIVE = "active"
     HISTORY = "history"
     SLOW = "slow"
@@ -137,7 +138,7 @@ class Fail2banTab(Vertical):
         """Handle tab clicks."""
         # Check if clicked widget is a tab
         widget = event.widget
-        if hasattr(widget, 'id'):
+        if hasattr(widget, "id"):
             if widget.id == "tab_active":
                 self._switch_to_tab(SubTab.ACTIVE)
             elif widget.id == "tab_history":
@@ -205,19 +206,12 @@ class Fail2banTab(Vertical):
 
         if self._current_tab == SubTab.ACTIVE:
             table.add_columns(
-                "Jail", "Status", "Service", "Banned IP", "Country", "Org",
-                "Attempts", "Ban For", "Banned", "Fail"
+                "Jail", "Status", "Service", "Banned IP", "Country", "Org", "Attempts", "Ban For", "Banned", "Fail"
             )
         elif self._current_tab == SubTab.HISTORY:
-            table.add_columns(
-                "Total", "Jail", "IP", "Country", "Org",
-                "Attempts", "Unbanned", "", ""
-            )
+            table.add_columns("Total", "Jail", "IP", "Country", "Org", "Attempts", "Unbanned", "", "")
         elif self._current_tab == SubTab.SLOW:
-            table.add_columns(
-                "Total", "Jail", "IP", "Country", "Org",
-                "Attempts", "Status", "Interval", ""
-            )
+            table.add_columns("Total", "Jail", "IP", "Country", "Org", "Attempts", "Status", "Interval", "")
 
     # === Actions ===
 
@@ -258,7 +252,7 @@ class Fail2banTab(Vertical):
         ip, jail = self._get_selected_ip_info()
         logger.debug(f"Selected IP info: ip={ip}, jail={jail}")
 
-        if not ip or ip in ('-', '?', ''):
+        if not ip or ip in ("-", "?", ""):
             self.notify("No valid IP selected", severity="warning")
             return
 
@@ -268,9 +262,9 @@ class Fail2banTab(Vertical):
             ConfirmModal(
                 title="Ban IP",
                 message=f"Ban [bold red]{ip}[/bold red] permanently in recidive jail?",
-                confirm_label="Ban"
+                confirm_label="Ban",
             ),
-            callback=lambda confirmed: self._do_ban_ip(ip, jail, time.time()) if confirmed else None
+            callback=lambda confirmed: self._do_ban_ip(ip, jail, time.time()) if confirmed else None,
         )
 
     @work(thread=True)
@@ -284,18 +278,16 @@ class Fail2banTab(Vertical):
         logger.debug("Notification sent, calling collector.ban_ip()")
 
         t1 = time.time()
-        success = self.collector.ban_ip(ip, jail='recidive')
+        success = self.collector.ban_ip(ip, jail="recidive")
         duration = time.time() - t1
         logger.debug(f"collector.ban_ip() completed in {duration:.3f}s, success={success}")
 
         if success:
-            self.app.call_from_thread(
-                self.notify, f"✓ Banned {ip} permanently", severity="information"
-            )
+            self.app.call_from_thread(self.notify, f"✓ Banned {ip} permanently", severity="information")
             logger.debug("Success notification sent")
 
             # Remove from original jail if it was a temporary ban
-            if jail and jail not in ('recidive', *VIRTUAL_JAILS):
+            if jail and jail not in ("recidive", *VIRTUAL_JAILS):
                 logger.debug(f"Cleaning up from original jail: {jail}")
                 if self.collector.unban_ip(ip, jail=jail):
                     logger.debug("Cleanup completed")
@@ -312,7 +304,7 @@ class Fail2banTab(Vertical):
         """Show confirmation and unban selected IP."""
         ip, jail = self._get_selected_ip_info()
 
-        if not ip or ip in ('-', '?', ''):
+        if not ip or ip in ("-", "?", ""):
             self.notify("No valid IP selected", severity="warning")
             return
 
@@ -322,11 +314,9 @@ class Fail2banTab(Vertical):
         # Show confirmation modal
         self.app.push_screen(
             ConfirmModal(
-                title="Unban IP",
-                message=f"Unban [bold cyan]{ip}[/bold cyan]{jail_info}?",
-                confirm_label="Unban"
+                title="Unban IP", message=f"Unban [bold cyan]{ip}[/bold cyan]{jail_info}?", confirm_label="Unban"
             ),
-            callback=lambda confirmed: self._do_unban_ip(ip, target_jail) if confirmed else None
+            callback=lambda confirmed: self._do_unban_ip(ip, target_jail) if confirmed else None,
         )
 
     @work(thread=True)
@@ -338,9 +328,7 @@ class Fail2banTab(Vertical):
         success = self.collector.unban_ip(ip, jail=jail)
         if success:
             logger.info(f"Unbanned {ip}")
-            self.app.call_from_thread(
-                self.notify, f"✓ Unbanned {ip}", severity="information"
-            )
+            self.app.call_from_thread(self.notify, f"✓ Unbanned {ip}", severity="information")
             # Refresh to show updated state
             self.update_data()
         else:
@@ -373,9 +361,9 @@ class Fail2banTab(Vertical):
             ConfirmModal(
                 title="Migrate Bans",
                 message="Migrate all recidive bans to [bold]3-year[/bold] bantime?",
-                confirm_label="Migrate"
+                confirm_label="Migrate",
             ),
-            callback=lambda confirmed: self._do_migrate_bans() if confirmed else None
+            callback=lambda confirmed: self._do_migrate_bans() if confirmed else None,
         )
 
     @work(thread=True)
@@ -386,14 +374,10 @@ class Fail2banTab(Vertical):
         success, total = self.collector.migrate_recidive_bans()
 
         if total == 0:
-            self.app.call_from_thread(
-                self.notify, "No bans to migrate", severity="warning"
-            )
+            self.app.call_from_thread(self.notify, "No bans to migrate", severity="warning")
         else:
             self.app.call_from_thread(
-                self.notify,
-                f"✓ Migrated {success}/{total} bans to 3 years",
-                severity="information"
+                self.notify, f"✓ Migrated {success}/{total} bans to 3 years", severity="information"
             )
             self.update_data()
 
@@ -490,7 +474,7 @@ class Fail2banTab(Vertical):
             else:
                 logger.debug(f"collector.update() completed in {duration:.3f}s")
             # Wrap in dict for compatibility with _update_view
-            self._last_data = {'fail2ban': f2b_data}
+            self._last_data = {"fail2ban": f2b_data}
             self._last_update = datetime.now()
             self.app.call_from_thread(self._update_view)
             logger.debug(f"Fail2Ban data update completed in {time.time() - t0:.2f}s")
@@ -506,7 +490,7 @@ class Fail2banTab(Vertical):
             table = self.query_one("#f2b_table", DataTable)
             header = self.query_one("#f2b_header", Label)
 
-            f2b = self._last_data.get('fail2ban', {})
+            f2b = self._last_data.get("fail2ban", {})
             self._update_header(header, f2b)
             self._populate_table(table, f2b)
         except Exception as e:
@@ -515,25 +499,25 @@ class Fail2banTab(Vertical):
     def _update_header(self, header: Label, f2b: Dict) -> None:
         """Update header with unified 2-line status info."""
         # Show error message if present
-        if f2b.get('error'):
+        if f2b.get("error"):
             header.update(f"[bold red]⚠ {f2b['error']}[/bold red]")
             return
 
         # Collect global stats
-        jails = [j for j in f2b.get('jails', []) if j.get('name') not in VIRTUAL_JAILS]
-        total_banned = sum(j.get('currently_banned', 0) for j in jails)
+        jails = [j for j in f2b.get("jails", []) if j.get("name") not in VIRTUAL_JAILS]
+        total_banned = sum(j.get("currently_banned", 0) for j in jails)
 
-        history_jail = next((j for j in f2b.get('jails', []) if j.get('name') == SECTION_HISTORY), None)
-        unbanned_count = history_jail.get('total_banned', 0) if history_jail else 0
+        history_jail = next((j for j in f2b.get("jails", []) if j.get("name") == SECTION_HISTORY), None)
+        unbanned_count = history_jail.get("total_banned", 0) if history_jail else 0
 
-        slow_jail = next((j for j in f2b.get('jails', []) if 'SLOW' in j.get('name', '')), None)
-        threats_count = slow_jail.get('total_banned', 0) if slow_jail else 0
+        slow_jail = next((j for j in f2b.get("jails", []) if "SLOW" in j.get("name", "")), None)
+        threats_count = slow_jail.get("total_banned", 0) if slow_jail else 0
         evasion_count = 0
         if slow_jail:
-            evasion_count = sum(1 for ip in slow_jail.get('banned_ips', []) if 'EVASION' in ip.get('status', ''))
+            evasion_count = sum(1 for ip in slow_jail.get("banned_ips", []) if "EVASION" in ip.get("status", ""))
 
         # Line 1: Global status (always visible)
-        status_str = "[green]Running[/green]" if f2b.get('running') else "[red]Stopped[/red]"
+        status_str = "[green]Running[/green]" if f2b.get("running") else "[red]Stopped[/red]"
         evasion_alert = f" │ [bold red blink]{evasion_count} EVADING[/bold red blink]" if evasion_count else ""
         line1 = (
             f"[bold cyan]Fail2ban:[/bold cyan] {status_str} │ "
@@ -549,12 +533,12 @@ class Fail2banTab(Vertical):
             update_time = f"[dim]Updated: {self._last_update.strftime('%H:%M:%S')}[/dim]"
 
         if self._current_tab == SubTab.ACTIVE:
-            active_jails = sum(1 for j in jails if j.get('currently_banned', 0) > 0)
+            active_jails = sum(1 for j in jails if j.get("currently_banned", 0) > 0)
             line2 = f"[cyan]Active:[/cyan] {active_jails}/{len(jails)} jails with bans"
         elif self._current_tab == SubTab.HISTORY:
             line2 = "[blue]History:[/blue] Recently unbanned IPs from all jails"
         elif self._current_tab == SubTab.SLOW:
-            excluded = slow_jail.get('excluded_count', 0) if slow_jail else 0
+            excluded = slow_jail.get("excluded_count", 0) if slow_jail else 0
             excluded_text = f" ({excluded} already banned)" if excluded else ""
             line2 = f"[yellow]Slow Detector:[/yellow] IPs evading findtime{excluded_text}"
 
@@ -570,15 +554,15 @@ class Fail2banTab(Vertical):
 
         def populate(t: DataTable) -> None:
             # Show error message if present
-            if f2b.get('error'):
+            if f2b.get("error"):
                 t.add_row(f"⚠ {f2b['error']}", *[""] * 8)
                 return
 
-            if not f2b or not f2b.get('installed'):
+            if not f2b or not f2b.get("installed"):
                 t.add_row("⚠ fail2ban not installed", *[""] * 8)
                 return
 
-            if not f2b.get('running'):
+            if not f2b.get("running"):
                 t.add_row("⚠ fail2ban not running", *[""] * 8)
                 return
 
@@ -593,7 +577,7 @@ class Fail2banTab(Vertical):
 
     def _populate_active_tab(self, t: DataTable, f2b: Dict) -> None:
         """Populate Active jails tab."""
-        jails = [j for j in f2b.get('jails', []) if j.get('name') not in VIRTUAL_JAILS]
+        jails = [j for j in f2b.get("jails", []) if j.get("name") not in VIRTUAL_JAILS]
 
         if not jails:
             t.add_row("No jails configured", *[""] * 9)
@@ -601,9 +585,9 @@ class Fail2banTab(Vertical):
 
         # Sort: OK jails first, ACTIVE jails next, recidive always last
         def sort_key(j: Dict) -> tuple:
-            name = j.get('name', '')
-            has_bans = j.get('currently_banned', 0) > 0
-            if name == 'recidive':
+            name = j.get("name", "")
+            has_bans = j.get("currently_banned", 0) > 0
+            if name == "recidive":
                 return (2, name)  # Always last
             elif has_bans:
                 return (1, name)  # ACTIVE jails in middle
@@ -616,18 +600,14 @@ class Fail2banTab(Vertical):
         if self._search_term:
             filtered_jails = []
             for jail in jails:
-                name = jail.get('name', '')
+                name = jail.get("name", "")
                 # Check jail name
                 if self._matches_search(name):
                     filtered_jails.append(jail)
                     continue
                 # Check banned IPs
-                for ip_info in jail.get('banned_ips', []):
-                    if self._matches_search(
-                        ip_info.get('ip', ''),
-                        ip_info.get('country', ''),
-                        ip_info.get('org', '')
-                    ):
+                for ip_info in jail.get("banned_ips", []):
+                    if self._matches_search(ip_info.get("ip", ""), ip_info.get("country", ""), ip_info.get("org", "")):
                         filtered_jails.append(jail)
                         break
             jails = filtered_jails
@@ -638,7 +618,7 @@ class Fail2banTab(Vertical):
 
         prev_had_bans = None
         for jail in jails:
-            has_bans = jail.get('currently_banned', 0) > 0
+            has_bans = jail.get("currently_banned", 0) > 0
             # Add separator only between OK→ACTIVE or ACTIVE→ACTIVE (not between OK→OK)
             need_separator = prev_had_bans is not None and (prev_had_bans or has_bans)
             self._render_regular_jail(t, jail, need_separator)
@@ -646,14 +626,14 @@ class Fail2banTab(Vertical):
 
     def _populate_history_tab(self, t: DataTable, f2b: Dict) -> None:
         """Populate History tab."""
-        history_jail = next((j for j in f2b.get('jails', []) if j.get('name') == SECTION_HISTORY), None)
+        history_jail = next((j for j in f2b.get("jails", []) if j.get("name") == SECTION_HISTORY), None)
 
         if not history_jail:
             t.add_row("No history data", *[""] * 8)
             return
 
-        banned_ips = history_jail.get('banned_ips', [])
-        total = history_jail.get('total_banned', 0)
+        banned_ips = history_jail.get("banned_ips", [])
+        total = history_jail.get("total_banned", 0)
 
         if not banned_ips:
             t.add_row("No recently unbanned IPs", *[""] * 8)
@@ -662,13 +642,9 @@ class Fail2banTab(Vertical):
         # Filter by search term
         if self._search_term:
             banned_ips = [
-                ip for ip in banned_ips
-                if self._matches_search(
-                    ip.get('ip', ''),
-                    ip.get('jail', ''),
-                    ip.get('country', ''),
-                    ip.get('org', '')
-                )
+                ip
+                for ip in banned_ips
+                if self._matches_search(ip.get("ip", ""), ip.get("jail", ""), ip.get("country", ""), ip.get("org", ""))
             ]
 
         if not banned_ips:
@@ -677,31 +653,31 @@ class Fail2banTab(Vertical):
 
         for idx, ip_info in enumerate(banned_ips):
             col0 = Text(f"Total: {total}", style="blue") if idx == 0 else ""
-            jail_origin = ip_info.get('jail', '?')
+            jail_origin = ip_info.get("jail", "?")
 
             t.add_row(
                 col0,
                 Text(f"[{jail_origin}]", style="cyan"),
-                Text(ip_info.get('ip', '?'), style="yellow"),
-                ip_info.get('country', 'Unknown'),
-                format_org(ip_info.get('org', '-')),
-                format_attempts(ip_info.get('attempts', 0)),
-                ip_info.get('unban_time', ''),
+                Text(ip_info.get("ip", "?"), style="yellow"),
+                ip_info.get("country", "Unknown"),
+                format_org(ip_info.get("org", "-")),
+                format_attempts(ip_info.get("attempts", 0)),
+                ip_info.get("unban_time", ""),
                 "",
-                ""
+                "",
             )
 
     def _populate_slow_tab(self, t: DataTable, f2b: Dict) -> None:
         """Populate Slow Detector tab."""
-        slow_jail = next((j for j in f2b.get('jails', []) if 'SLOW' in j.get('name', '')), None)
+        slow_jail = next((j for j in f2b.get("jails", []) if "SLOW" in j.get("name", "")), None)
 
         if not slow_jail:
             t.add_row("No analysis data. Press 'a' to analyze.", *[""] * 8)
             return
 
-        banned_ips = slow_jail.get('banned_ips', [])
-        total = slow_jail.get('total_banned', 0)
-        excluded = slow_jail.get('excluded_count', 0)
+        banned_ips = slow_jail.get("banned_ips", [])
+        total = slow_jail.get("total_banned", 0)
+        excluded = slow_jail.get("excluded_count", 0)
 
         if not banned_ips:
             if excluded > 0:
@@ -711,18 +687,15 @@ class Fail2banTab(Vertical):
             return
 
         # Filter out whitelisted IPs
-        banned_ips = [ip for ip in banned_ips if not self.collector.is_whitelisted(ip.get('ip', ''))]
+        banned_ips = [ip for ip in banned_ips if not self.collector.is_whitelisted(ip.get("ip", ""))]
 
         # Filter by search term
         if self._search_term:
             banned_ips = [
-                ip for ip in banned_ips
+                ip
+                for ip in banned_ips
                 if self._matches_search(
-                    ip.get('ip', ''),
-                    ip.get('jail', ''),
-                    ip.get('country', ''),
-                    ip.get('org', ''),
-                    ip.get('status', '')
+                    ip.get("ip", ""), ip.get("jail", ""), ip.get("country", ""), ip.get("org", ""), ip.get("status", "")
                 )
             ]
 
@@ -743,9 +716,9 @@ class Fail2banTab(Vertical):
             else:
                 col0 = ""
 
-            jail_origin = ip_info.get('jail', '?')
-            status = ip_info.get('status', '')
-            interval = ip_info.get('interval', '')
+            jail_origin = ip_info.get("jail", "?")
+            status = ip_info.get("status", "")
+            interval = ip_info.get("interval", "")
 
             # Highlight EVASION status
             status_style = "bold red" if "EVASION" in status else "yellow"
@@ -753,31 +726,28 @@ class Fail2banTab(Vertical):
             t.add_row(
                 col0,
                 Text(f"[{jail_origin}]", style="cyan"),
-                Text(ip_info.get('ip', '?'), style="red"),
-                ip_info.get('country', 'Unknown'),
-                format_org(ip_info.get('org', '-')),
-                format_attempts(ip_info.get('attempts', 0)),
+                Text(ip_info.get("ip", "?"), style="red"),
+                ip_info.get("country", "Unknown"),
+                format_org(ip_info.get("org", "-")),
+                format_attempts(ip_info.get("attempts", 0)),
                 Text(status, style=status_style),
                 Text(interval, style="bold cyan") if interval else "",
-                ""
+                "",
             )
 
     def _render_regular_jail(self, t: DataTable, jail: Dict, add_separator: bool = False) -> None:
         """Render a regular jail with its banned IPs."""
-        name = jail.get('name', 'N/A')
-        currently_banned = jail.get('currently_banned', 0)
-        filter_failures = jail.get('filter_failures', 0)
-        banned_ips = jail.get('banned_ips', [])
+        name = jail.get("name", "N/A")
+        currently_banned = jail.get("currently_banned", 0)
+        filter_failures = jail.get("filter_failures", 0)
+        banned_ips = jail.get("banned_ips", [])
 
         # Filter IPs by search term (if search doesn't match jail name)
         if self._search_term and not self._matches_search(name):
             banned_ips = [
-                ip for ip in banned_ips
-                if self._matches_search(
-                    ip.get('ip', ''),
-                    ip.get('country', ''),
-                    ip.get('org', '')
-                )
+                ip
+                for ip in banned_ips
+                if self._matches_search(ip.get("ip", ""), ip.get("country", ""), ip.get("org", ""))
             ]
 
         # Add separator if needed
@@ -789,11 +759,7 @@ class Fail2banTab(Vertical):
 
         if not banned_ips:
             t.add_row(
-                Text(name, style="bold"),
-                status_text,
-                "-", "-", "-", "-", "-", "-",
-                banned_text,
-                str(filter_failures)
+                Text(name, style="bold"), status_text, "-", "-", "-", "-", "-", "-", banned_text, str(filter_failures)
             )
         else:
             # First IP row includes jail name and stats
@@ -801,14 +767,14 @@ class Fail2banTab(Vertical):
             t.add_row(
                 Text(name, style="bold"),
                 status_text,
-                Text(first_ip.get('target', '-'), style="blue"),
-                Text(first_ip.get('ip', '?'), style="red"),
-                first_ip.get('country', 'Unknown'),
-                format_org(first_ip.get('org', '-')),
-                format_attempts(first_ip.get('attempts', 0)),
-                format_bantime(first_ip.get('bantime', 0)),
+                Text(first_ip.get("target", "-"), style="blue"),
+                Text(first_ip.get("ip", "?"), style="red"),
+                first_ip.get("country", "Unknown"),
+                format_org(first_ip.get("org", "-")),
+                format_attempts(first_ip.get("attempts", 0)),
+                format_bantime(first_ip.get("bantime", 0)),
                 banned_text,
-                str(filter_failures)
+                str(filter_failures),
             )
 
             # Additional IPs
@@ -816,12 +782,12 @@ class Fail2banTab(Vertical):
                 t.add_row(
                     "",
                     "",
-                    Text(ip_info.get('target', '-'), style="blue"),
-                    Text(ip_info.get('ip', '?'), style="red"),
-                    ip_info.get('country', 'Unknown'),
-                    format_org(ip_info.get('org', '-')),
-                    format_attempts(ip_info.get('attempts', 0)),
-                    format_bantime(ip_info.get('bantime', 0)),
+                    Text(ip_info.get("target", "-"), style="blue"),
+                    Text(ip_info.get("ip", "?"), style="red"),
+                    ip_info.get("country", "Unknown"),
+                    format_org(ip_info.get("org", "-")),
+                    format_attempts(ip_info.get("attempts", 0)),
+                    format_bantime(ip_info.get("bantime", 0)),
                     "",
-                    ""
+                    "",
                 )

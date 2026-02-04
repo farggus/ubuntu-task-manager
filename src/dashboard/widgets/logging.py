@@ -327,13 +327,9 @@ class LoggingTab(Vertical):
         try:
             with open(export_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(filtered_lines))
-            self.app.call_from_thread(
-                self.notify, f"Exported {len(filtered_lines)} lines to {export_file}"
-            )
+            self.app.call_from_thread(self.notify, f"Exported {len(filtered_lines)} lines to {export_file}")
         except Exception as e:
-            self.app.call_from_thread(
-                self.notify, f"Export failed: {e}", severity="error"
-            )
+            self.app.call_from_thread(self.notify, f"Export failed: {e}", severity="error")
 
     @on(Input.Changed, "#log_search")
     def on_search_changed(self, event: Input.Changed) -> None:
@@ -369,9 +365,7 @@ class LoggingTab(Vertical):
         else:
             abbrev = {"DEBUG": "D", "INFO": "I", "WARNING": "W", "ERROR": "E", "CRITICAL": "C"}
             level_order = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-            filter_text = "".join(
-                abbrev[lvl] for lvl in level_order if lvl in self.active_levels
-            )
+            filter_text = "".join(abbrev[lvl] for lvl in level_order if lvl in self.active_levels)
             filter_style = "yellow"
 
         # Module indicator
@@ -504,10 +498,7 @@ class LoggingTab(Vertical):
         if self.search_term:
             # Case-insensitive replacement with highlighting
             pattern = re.compile(re.escape(self.search_term), re.IGNORECASE)
-            escaped_line = pattern.sub(
-                lambda m: f"[reverse]{m.group()}[/reverse]",
-                escaped_line
-            )
+            escaped_line = pattern.sub(lambda m: f"[reverse]{m.group()}[/reverse]", escaped_line)
 
         return f"[{color}]{escaped_line}[/{color}]"
 

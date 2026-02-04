@@ -70,7 +70,7 @@ class ProcessesTab(Vertical):
         start = time.time()
         super().__init__()
         self.collector = collector
-        self.view_mode = 'all'  # 'all' or 'zombies'
+        self.view_mode = "all"  # 'all' or 'zombies'
         self.sort_column = "CPU%"  # Default sort column
         self.sort_reverse = True  # Default descending (highest CPU first)
         self._last_data: Dict[str, Any] = {}  # Cache for re-sorting
@@ -121,15 +121,15 @@ class ProcessesTab(Vertical):
 
     def action_view_all(self) -> None:
         """Switch to 'all' processes view."""
-        if self.view_mode != 'all':
-            self.view_mode = 'all'
+        if self.view_mode != "all":
+            self.view_mode = "all"
             self.notify("Showing all processes")
             self.update_data()
 
     def action_view_zombies(self) -> None:
         """Switch to 'zombies' view."""
-        if self.view_mode != 'zombies':
-            self.view_mode = 'zombies'
+        if self.view_mode != "zombies":
+            self.view_mode = "zombies"
             self.notify("Showing zombie processes")
             self.update_data()
 
@@ -144,7 +144,7 @@ class ProcessesTab(Vertical):
     def _signal_parent(self, sig, action_name: str) -> None:
         """Helper to send a signal to the parent process."""
         table = self.query_one("#proc_table", DataTable)
-        if self.view_mode != 'zombies' or table.cursor_row is None:
+        if self.view_mode != "zombies" or table.cursor_row is None:
             self.notify("This action is only for zombies in the Zombies view", severity="warning")
             return
 
@@ -173,12 +173,12 @@ class ProcessesTab(Vertical):
         self._last_data = data  # Cache for re-sorting
         table = self.query_one(DataTable)
 
-        processes = data.get('processes', [])
+        processes = data.get("processes", [])
 
         def populate(t):
             # Filter based on view mode
-            if self.view_mode == 'zombies':
-                filtered_list = [p for p in processes if p.get('status') == psutil.STATUS_ZOMBIE]
+            if self.view_mode == "zombies":
+                filtered_list = [p for p in processes if p.get("status") == psutil.STATUS_ZOMBIE]
             else:
                 filtered_list = processes
 
@@ -187,28 +187,26 @@ class ProcessesTab(Vertical):
                 field, type_fn = COLUMN_SORT_KEYS[self.sort_column]
                 try:
                     filtered_list = sorted(
-                        filtered_list,
-                        key=lambda x: type_fn(x.get(field, 0) or 0),
-                        reverse=self.sort_reverse
+                        filtered_list, key=lambda x: type_fn(x.get(field, 0) or 0), reverse=self.sort_reverse
                     )
                 except (ValueError, TypeError):
                     pass  # Fall back to original order if sorting fails
 
             for p in filtered_list[:1000]:  # Limit to 1000 rows for performance
-                pid = str(p.get('pid', ''))
-                name = p.get('name', '')
-                user = p.get('user', '')
-                status = p.get('status', '')
+                pid = str(p.get("pid", ""))
+                name = p.get("name", "")
+                user = p.get("user", "")
+                status = p.get("status", "")
                 cpu = f"{p.get('cpu', 0):.1f}"
                 mem = f"{p.get('mem_pct', 0):.1f}"
-                cmd = p.get('command', '')
-                ppid = str(p.get('ppid', ''))
+                cmd = p.get("command", "")
+                ppid = str(p.get("ppid", ""))
 
                 # Display running* for sleeping processes with CPU usage
                 status_display = status
                 status_style = "white"
 
-                if status == psutil.STATUS_SLEEPING and p.get('cpu', 0.0) > 0.0:
+                if status == psutil.STATUS_SLEEPING and p.get("cpu", 0.0) > 0.0:
                     status_display = "running*"
                     status_style = "bold green"
                 elif status == psutil.STATUS_RUNNING:
@@ -223,12 +221,12 @@ class ProcessesTab(Vertical):
         update_table_preserving_scroll(table, populate)
 
         # Update Header
-        stats = data.get('stats', {})
-        total = stats.get('total', 0)
-        running = stats.get('running', 0)
-        sleeping = stats.get('sleeping', 0)
-        zombies = stats.get('zombies', 0)
-        other = stats.get('other', 0)
+        stats = data.get("stats", {})
+        total = stats.get("total", 0)
+        running = stats.get("running", 0)
+        sleeping = stats.get("sleeping", 0)
+        zombies = stats.get("zombies", 0)
+        other = stats.get("other", 0)
 
         zombie_color = "red" if zombies > 0 else "green"
 

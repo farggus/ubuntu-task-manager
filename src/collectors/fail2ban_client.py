@@ -45,12 +45,7 @@ class Fail2banClient:
         """
         try:
             full_cmd = ["sudo", "fail2ban-client"] + cmd
-            result = subprocess.run(
-                full_cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout
-            )
+            result = subprocess.run(full_cmd, capture_output=True, text=True, timeout=self.timeout)
             if result.returncode == 0:
                 return result.stdout.strip()
             else:
@@ -69,11 +64,7 @@ class Fail2banClient:
             return self._installed
 
         try:
-            result = subprocess.run(
-                ["which", "fail2ban-client"],
-                capture_output=True,
-                timeout=5
-            )
+            result = subprocess.run(["which", "fail2ban-client"], capture_output=True, timeout=5)
             self._installed = result.returncode == 0
         except Exception:
             self._installed = False
@@ -122,7 +113,7 @@ class Fail2banClient:
             "total_failed": 0,
             "currently_banned": 0,
             "total_banned": 0,
-            "banned_ips": []
+            "banned_ips": [],
         }
 
         # Parse status output
@@ -159,11 +150,7 @@ class Fail2banClient:
         Returns:
             Dict with jail config
         """
-        result = {
-            "findtime": None,
-            "bantime": None,
-            "maxretry": None
-        }
+        result = {"findtime": None, "bantime": None, "maxretry": None}
 
         for key in ["findtime", "bantime", "maxretry"]:
             output = self._run_command(["get", jail, key])
@@ -261,5 +248,5 @@ class Fail2banClient:
             "jails_count": len(jails),
             "jails_with_bans": jails_with_bans,
             "total_banned": total_banned,
-            "jails": jails
+            "jails": jails,
         }

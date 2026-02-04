@@ -191,20 +191,20 @@ class UTMDashboard(App):
         path = Path(config_path)
         config = {}
         if path.exists():
-            with open(path, 'r') as f:
+            with open(path, "r") as f:
                 config = yaml.safe_load(f) or {}
 
         # Environment variable overrides
         # Docker settings
-        if os_module.getenv('UTM_DOCKER_ENABLED'):
-            if 'docker' not in config:
-                config['docker'] = {}
-            config['docker']['enabled'] = os_module.getenv('UTM_DOCKER_ENABLED').lower() == 'true'
+        if os_module.getenv("UTM_DOCKER_ENABLED"):
+            if "docker" not in config:
+                config["docker"] = {}
+            config["docker"]["enabled"] = os_module.getenv("UTM_DOCKER_ENABLED").lower() == "true"
 
-        if os_module.getenv('UTM_DOCKER_SOCKET'):
-            if 'docker' not in config:
-                config['docker'] = {}
-            config['docker']['socket'] = os_module.getenv('UTM_DOCKER_SOCKET')
+        if os_module.getenv("UTM_DOCKER_SOCKET"):
+            if "docker" not in config:
+                config["docker"] = {}
+            config["docker"]["socket"] = os_module.getenv("UTM_DOCKER_SOCKET")
 
         return config
 
@@ -355,6 +355,7 @@ class UTMDashboard(App):
     def action_toggle_system_info(self) -> None:
         """Toggle visibility of the System Information widget."""
         from dashboard.widgets.system_info import CompactSystemInfo
+
         system_info = self.query_one(CompactSystemInfo)
         system_info.display = not system_info.display
 
@@ -374,7 +375,7 @@ class UTMDashboard(App):
             # Find the widget inside the active TabPane
             active_pane = self.query_one(f"#--content-tab-{active_tab_id}")
             for child in active_pane.children:
-                if hasattr(child, 'update_data'):
+                if hasattr(child, "update_data"):
                     child.update_data()
                     break
         except Exception as e:
@@ -392,7 +393,7 @@ class UTMDashboard(App):
             notify_via_thread: If True, use call_from_thread for notifications (when called from @work).
         """
         try:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"utm_snapshot_{timestamp}.json"
 
             # Collect data from all collectors
@@ -404,10 +405,10 @@ class UTMDashboard(App):
                 "network": self.network_collector.get_data(),
                 "tasks": self.tasks_collector.get_data(),
                 "processes": self.processes_collector.get_data(),
-                "users": self.users_collector.get_data()
+                "users": self.users_collector.get_data(),
             }
 
-            with open(filename, 'w', encoding='utf-8') as f:
+            with open(filename, "w", encoding="utf-8") as f:
                 json.dump(snapshot, f, indent=2, default=str)
 
             logger.info(f"Snapshot exported to {filename}")
@@ -450,6 +451,7 @@ class UTMDashboard(App):
     def watch_update_interval(self, new_interval: int) -> None:
         """React to interval changes - update system info display and widgets."""
         from dashboard.widgets.system_info import CompactSystemInfo
+
         try:
             system_info = self.query_one(CompactSystemInfo)
             system_info.update_interval_display(new_interval)

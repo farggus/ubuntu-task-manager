@@ -72,13 +72,13 @@ class MountModal(ModalScreen):
         self.action = action  # 'mount' or 'unmount'
 
     def compose(self) -> ComposeResult:
-        title = "Unmount Partition" if self.action == 'unmount' else "Mount Partition"
+        title = "Unmount Partition" if self.action == "unmount" else "Mount Partition"
 
         with Vertical(id="mount_container"):
             yield Label(title, id="mount_title")
             yield Static(id="mount_info")
 
-            if self.action == 'mount':
+            if self.action == "mount":
                 with Horizontal(id="mount_input_container"):
                     yield Label("Mountpoint:")
                     yield Input(placeholder="/mnt/mydisk", id="mountpoint_input")
@@ -86,7 +86,7 @@ class MountModal(ModalScreen):
             yield Static(id="mount_result")
 
             with Horizontal(id="mount_buttons"):
-                if self.action == 'unmount':
+                if self.action == "unmount":
                     yield Button("Unmount", id="action_btn", variant="error")
                 else:
                     yield Button("Mount", id="action_btn", variant="success")
@@ -94,7 +94,7 @@ class MountModal(ModalScreen):
 
     def on_mount(self) -> None:
         """Display device info."""
-        if self.action == 'unmount':
+        if self.action == "unmount":
             info = Text()
             info.append("Device: ", style="cyan")
             info.append(f"{self.device}\n", style="white")
@@ -121,7 +121,7 @@ class MountModal(ModalScreen):
         result_widget = self.query_one("#mount_result", Static)
 
         try:
-            if self.action == 'unmount':
+            if self.action == "unmount":
                 # Unmount
                 cmd = [UMOUNT, self.mountpoint]
                 if os.geteuid() != 0:
@@ -145,13 +145,13 @@ class MountModal(ModalScreen):
                     result_widget.update(Text("Please enter a mountpoint.", style="yellow"))
                     return
 
-                if not mountpoint.startswith('/'):
+                if not mountpoint.startswith("/"):
                     result_widget.update(Text("Mountpoint must be an absolute path.", style="yellow"))
                     return
 
                 # Create mountpoint if it doesn't exist
                 if not os.path.exists(mountpoint):
-                    mkdir_cmd = [MKDIR, '-p', mountpoint]
+                    mkdir_cmd = [MKDIR, "-p", mountpoint]
                     if os.geteuid() != 0:
                         mkdir_cmd = [SUDO] + mkdir_cmd
                     subprocess.run(mkdir_cmd, capture_output=True, timeout=10)

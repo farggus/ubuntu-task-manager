@@ -49,7 +49,7 @@ class BaseCollector(ABC):
             error_msg = f"Error collecting data: {str(e)}"
             logger.error(f"{self.name}: {error_msg}", exc_info=True)
             self.errors.append(error_msg)
-            self.data['error'] = error_msg
+            self.data["error"] = error_msg
 
         return self.data
 
@@ -69,4 +69,4 @@ class BaseCollector(ABC):
     @property
     def name(self) -> str:
         """Get collector name."""
-        return self.__class__.__name__.replace('Collector', '')
+        return self.__class__.__name__.replace("Collector", "")

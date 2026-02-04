@@ -69,10 +69,10 @@ def format_org(org: str, max_len: int = ORG_DISPLAY_MAX_LEN) -> str:
     Returns:
         Truncated org name with ellipsis if needed
     """
-    if not org or org == '-':
-        return '-'
+    if not org or org == "-":
+        return "-"
     if len(org) > max_len:
-        return org[:max_len - 3] + '...'
+        return org[: max_len - 3] + "..."
     return org
 
 
@@ -86,9 +86,9 @@ def format_status(status: str) -> Text:
         Rich Text object with appropriate styling
     """
     text = Text(status)
-    if 'EVASION' in status:
+    if "EVASION" in status:
         text.style = "bold red"
-    elif 'CAUGHT' in status:
+    elif "CAUGHT" in status:
         text.style = "bold yellow"
     return text
 

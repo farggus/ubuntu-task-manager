@@ -154,10 +154,12 @@ class F2BDatabaseModal(ModalScreen):
 
             result = self._collector.collect()
 
-            if result.get('success'):
-                msg = (f"✅ Parsed: {result['bans_found']} bans, "
-                       f"{result['attempts_found']} attempts, "
-                       f"{result['new_ips']} new IPs ({result['parse_time']:.1f}s)")
+            if result.get("success"):
+                msg = (
+                    f"✅ Parsed: {result['bans_found']} bans, "
+                    f"{result['attempts_found']} attempts, "
+                    f"{result['new_ips']} new IPs ({result['parse_time']:.1f}s)"
+                )
             else:
                 msg = f"❌ Failed: {result.get('error', 'Unknown')}"
 
@@ -185,9 +187,11 @@ class F2BDatabaseModal(ModalScreen):
             stats = self._collector.parse_full(reset_positions=True)
             duration = time.time() - t0
 
-            msg = (f"✅ Full: {stats['bans']} bans, "
-                   f"{stats['attempts']} attempts, "
-                   f"{stats['new_ips']} new IPs ({duration:.1f}s)")
+            msg = (
+                f"✅ Full: {stats['bans']} bans, "
+                f"{stats['attempts']} attempts, "
+                f"{stats['new_ips']} new IPs ({duration:.1f}s)"
+            )
 
             self.app.call_from_thread(self._update_status, msg)
             self.app.call_from_thread(self._refresh_table)
@@ -203,12 +207,14 @@ class F2BDatabaseModal(ModalScreen):
             return
 
         stats = self._db.get_stats()
-        msg = (f"📊 {stats['total_ips']} IPs, "
-               f"{stats['total_attempts']} attempts, "
-               f"{stats['total_bans']} bans, "
-               f"{stats['active_bans']} active")
+        msg = (
+            f"📊 {stats['total_ips']} IPs, "
+            f"{stats['total_attempts']} attempts, "
+            f"{stats['total_bans']} bans, "
+            f"{stats['active_bans']} active"
+        )
 
-        if stats.get('top_country'):
+        if stats.get("top_country"):
             msg += f" | Top: {stats['top_country']}"
 
         self._update_status(msg)
@@ -261,7 +267,7 @@ class F2BDatabaseModal(ModalScreen):
                     str(bans.get("total", 0)),
                     status,
                     danger_str,
-                    key=ip
+                    key=ip,
                 )
         except Exception as e:
             logger.error(f"Table refresh failed: {e}")

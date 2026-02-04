@@ -8,8 +8,8 @@ from models.fail2ban import (
 )
 
 __all__ = [
-    'BannedIP',
-    'Fail2banStatus',
-    'JailInfo',
-    'JailType',
+    "BannedIP",
+    "Fail2banStatus",
+    "JailInfo",
+    "JailType",
 ]
