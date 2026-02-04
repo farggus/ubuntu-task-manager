@@ -11,13 +11,18 @@ import sys
 import time
 from pathlib import Path
 
-# Performance profiling from start
+# Check for --debug early (before full arg parsing) to enable startup profiling
+_debug_mode = "--debug" in sys.argv or os.getenv("UTM_DEBUG", "").lower() in ("1", "true")
+
+# Performance profiling (only in debug mode)
 _startup_start = time.time()
 _startup_marks = {}
 
 
 def _mark(label: str):
-    """Record startup timing mark."""
+    """Record startup timing mark (only outputs in debug mode)."""
+    if not _debug_mode:
+        return
     elapsed = (time.time() - _startup_start) * 1000
     _startup_marks[label] = elapsed
     print(f"[STARTUP] {label}: {elapsed:.1f}ms", flush=True)
@@ -37,8 +42,6 @@ _mark("Before const import")
 from const import APP_NAME, APP_VERSION, DEFAULT_CONFIG, LOGGER_PREFIX, SLOW_BOTS_FILE  # noqa: E402
 
 _mark("After const import")
-
-_mark("Skipping dashboard import at module level")
 
 _mark("Before logger import")
 from utils.logger import setup_exception_logging, setup_logging  # noqa: E402
@@ -62,20 +65,16 @@ def main():
     _mark("main() start")
 
     parser = argparse.ArgumentParser(description=f"{APP_NAME} - Monitor your server")
-    _mark("ArgumentParser created")
-
     parser.add_argument(
         "-c", "--config", default=DEFAULT_CONFIG, help=f"Path to configuration file (default: {DEFAULT_CONFIG})"
     )
     parser.add_argument("--version", action="version", version=f"{APP_NAME} {APP_VERSION}")
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging and startup profiling")
 
-    _mark("Before args.parse_args()")
     args = parser.parse_args()
     _mark("After args.parse_args()")
 
     # Configure logging
-    _mark("Before setup_logging()")
     log_level = logging.DEBUG if args.debug else logging.INFO
     setup_logging(level=log_level)
     setup_exception_logging()
@@ -94,25 +93,17 @@ def main():
         logger.info(f"========== Starting {APP_NAME} ==========")
 
         # Lazy import dashboard - done here instead of module level to avoid blocking startup
-        _mark("Before dashboard import in main()")
+        _mark("Before dashboard import")
         from dashboard import UTMDashboard  # noqa: E402
 
-        _mark("After dashboard import in main()")
+        _mark("After dashboard import")
 
-        # Time app initialization
-        start = time.time()
         app = UTMDashboard(config_path=str(config_path))
-        init_time = (time.time() - start) * 1000
-        logger.info(f"App initialized in {init_time:.1f}ms")
-        _mark(f"After app init ({init_time:.1f}ms)")
+        _mark("After app init")
 
-        # Time app.run()
         _mark("Before app.run()")
-        start = time.time()
         app.run()
-        run_time = (time.time() - start) * 1000
-        logger.info(f"App.run() completed in {run_time:.1f}ms")
-        _mark(f"After app.run() ({run_time:.1f}ms)")
+        _mark("After app.run()")
 
     except KeyboardInterrupt:
         print("\nExiting...")
@@ -129,11 +120,12 @@ def main():
             except Exception as e:
                 logger.error(f"Failed to remove temporary file {SLOW_BOTS_FILE}: {e}")
 
-        # Print final summary
-        _mark("Shutdown")
-        print("\n[STARTUP PROFILE SUMMARY]")
-        for label, elapsed in _startup_marks.items():
-            print(f"  {label}: {elapsed:.1f}ms")
+        # Print final summary (only in debug mode)
+        if _debug_mode and _startup_marks:
+            _mark("Shutdown")
+            print("\n[STARTUP PROFILE SUMMARY]")
+            for label, elapsed in _startup_marks.items():
+                print(f"  {label}: {elapsed:.1f}ms")
 
 
 if __name__ == "__main__":
