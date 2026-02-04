@@ -8,6 +8,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 import sentry_sdk
@@ -70,9 +71,18 @@ def main():
 
     try:
         logger.info(f"========== Starting {APP_NAME} ==========")
-        # Run the dashboard
+
+        # Time app initialization
+        start = time.time()
         app = UTMDashboard(config_path=str(config_path))
+        init_time = (time.time() - start) * 1000
+        logger.info(f"App initialized in {init_time:.1f}ms")
+
+        # Time app.run()
+        start = time.time()
         app.run()
+        run_time = (time.time() - start) * 1000
+        logger.info(f"App.run() completed in {run_time:.1f}ms")
     except KeyboardInterrupt:
         print("\nExiting...")
         logger.info("Application stopped by user")

@@ -3,6 +3,7 @@
 import json
 import os as os_module
 import platform
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -211,45 +212,121 @@ class UTMDashboard(App):
         return config
 
     def compose(self) -> ComposeResult:
+        """Compose UI hierarchy with lazy tab loading."""
+        start = time.time()
+
+        # Header (fast)
+        header_start = time.time()
         yield Header()
+        logger.debug(f"Header created in {(time.time()-header_start)*1000:.1f}ms")
+
         with Container(classes="main-container"):
+            # System Info (fast on first mount due to call_later)
+            sysinfo_start = time.time()
             yield CompactSystemInfo(self.system_collector)
+            logger.debug(f"CompactSystemInfo created in {(time.time()-sysinfo_start)*1000:.1f}ms")
 
-            with TabbedContent(initial="processes"):
+            # Tabs with detailed profiling
+            tabs_start = time.time()
+            with TabbedContent(initial="services"):  # Default to Services instead of Processes
+                # Tab 1: Processes (created later in background)
+                t = time.time()
                 with TabPane("[b green]1[/] Processes", id="processes"):
-                    yield ProcessesTab(self.processes_collector)
+                    from textual.widgets import Static
+                    # Create placeholder - actual ProcessesTab will be mounted asynchronously
+                    yield Static("Loading...")  # Fast placeholder
+                logger.debug(f"  Processes tab placeholder: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab 2: Services
+                t = time.time()
                 with TabPane("[b green]2[/] Services", id="services"):
                     yield ServicesTab(self.services_collector)
+                logger.debug(f"  Services tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab 3: Packages
+                t = time.time()
                 with TabPane("[b green]3[/] Packages", id="packages"):
                     yield PackagesTab(self.system_collector)
+                logger.debug(f"  Packages tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab 4: Containers
+                t = time.time()
                 with TabPane("[b green]4[/] Containers", id="containers"):
                     yield ContainersTab(self.services_collector)
+                logger.debug(f"  Containers tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab 5: Tasks
+                t = time.time()
                 with TabPane("[b green]5[/] Tasks", id="tasks"):
                     yield TasksExtendedTab(self.tasks_collector)
+                logger.debug(f"  Tasks tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab 6: Network
+                t = time.time()
                 with TabPane("[b green]6[/] Network", id="network"):
                     yield NetworkExtendedTab(self.network_collector)
+                logger.debug(f"  Network tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab F: Fail2ban
+                t = time.time()
                 with TabPane("[b green]F[/] Fail2ban", id="fail2ban"):
                     yield Fail2banTab(self.fail2ban_collector)
+                logger.debug(f"  Fail2ban tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab F+: Fail2ban+
+                t = time.time()
                 with TabPane("[b cyan]F+[/] Fail2ban+", id="fail2ban_plus"):
                     yield Fail2banPlusTab()
+                logger.debug(f"  Fail2ban+ tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab 7: Users
+                t = time.time()
                 with TabPane("[b green]7[/] Users", id="users"):
                     yield UsersTab(self.users_collector)
+                logger.debug(f"  Users tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab 8: Disks
+                t = time.time()
                 with TabPane("[b green]8[/] Disks", id="disks"):
                     yield DisksTab(self.system_collector)
+                logger.debug(f"  Disks tab: {(time.time()-t)*1000:.1f}ms")
 
+                # Tab 0: Logging
+                t = time.time()
                 with TabPane("[b green]0[/] Logging", id="logging"):
                     yield LoggingTab()
+                logger.debug(f"  Logging tab: {(time.time()-t)*1000:.1f}ms")
 
+            logger.debug(f"All tabs created in {(time.time()-tabs_start)*1000:.1f}ms")
+
+        # Footer (fast)
+        footer_start = time.time()
         yield Footer()
+        logger.debug(f"Footer created in {(time.time()-footer_start)*1000:.1f}ms")
+
+        total_time = (time.time() - start) * 1000
+        logger.info(f"compose() completed in {total_time:.1f}ms")
+
+        # Schedule ProcessesTab creation for next event cycle (avoids blocking on startup)
+        self.call_later(self._init_processes_tab)
+
+    def _init_processes_tab(self) -> None:
+        """Replace placeholder Processes tab with actual widget (deferred initialization)."""
+        try:
+            tabbed_content = self.query_one(TabbedContent)
+            processes_pane = tabbed_content.get_pane("processes")
+
+            if processes_pane and processes_pane.children:
+                # Remove placeholder
+                placeholder = processes_pane.children[0]
+                placeholder.remove()
+
+                # Add real ProcessesTab
+                processes_tab = ProcessesTab(self.processes_collector)
+                processes_pane.mount(processes_tab)
+                logger.debug("ProcessesTab initialized asynchronously")
+        except Exception as e:
+            logger.error(f"Failed to initialize ProcessesTab: {e}")
 
     def action_toggle_system_info(self) -> None:
         """Toggle visibility of the System Information widget."""

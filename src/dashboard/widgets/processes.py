@@ -2,6 +2,7 @@
 
 import os
 import signal
+import time
 from typing import Any, Dict
 
 import psutil
@@ -66,6 +67,7 @@ class ProcessesTab(Vertical):
     """
 
     def __init__(self, collector: ProcessesCollector):
+        start = time.time()
         super().__init__()
         self.collector = collector
         self.view_mode = 'all'  # 'all' or 'zombies'
@@ -73,19 +75,24 @@ class ProcessesTab(Vertical):
         self.sort_reverse = True  # Default descending (highest CPU first)
         self._last_data: Dict[str, Any] = {}  # Cache for re-sorting
         self._data_loaded = False  # Lazy loading flag
+        logger.debug(f"ProcessesTab.__init__ completed in {(time.time()-start)*1000:.1f}ms")
 
     def compose(self):
+        start = time.time()
         # Header
         with Static(id="proc_header_container"):
             yield Label("Loading processes...", id="proc_header")
 
         # Single table for all views
         yield DataTable(id="proc_table", cursor_type="row", zebra_stripes=True)
+        logger.debug(f"ProcessesTab.compose() completed in {(time.time()-start)*1000:.1f}ms")
 
     def on_mount(self) -> None:
         """Setup table structure (no data loading)."""
+        start = time.time()
         table = self.query_one(DataTable)
         table.add_columns("PID", "Name", "User", "Status", "CPU%", "Mem%", "Parent", "Command")
+        logger.debug(f"ProcessesTab.on_mount() completed in {(time.time()-start)*1000:.1f}ms")
 
     def on_show(self) -> None:
         """Load data when tab becomes visible."""
