@@ -99,6 +99,8 @@ class UTMDashboard(App):
         super().__init__()
         self.title = f"{platform.node()} UTM"
         self.config = self.load_config(config_path)
+        # Startup timing for profiling
+        self._init_time = time.time()
         # Lazy-initialized collectors (created on first access)
         self._system_collector: SystemCollector | None = None
         self._services_collector: ServicesCollector | None = None
@@ -319,6 +321,16 @@ class UTMDashboard(App):
         # Schedule ProcessesTab creation for next event cycle (avoids blocking on startup)
         self.call_later(self._init_processes_tab)
 
+    def on_mount(self) -> None:
+        """Log when app is mounted (UI tree ready)."""
+        elapsed = (time.time() - self._init_time) * 1000
+        logger.info(f"[STARTUP] App mounted (UI tree ready): {elapsed:.1f}ms since init")
+
+    def on_ready(self) -> None:
+        """Log when app is fully ready (first frame rendered)."""
+        elapsed = (time.time() - self._init_time) * 1000
+        logger.info(f"[STARTUP] App ready (first frame): {elapsed:.1f}ms since init")
+
     def _init_processes_tab(self) -> None:
         """Replace placeholder Processes tab with actual widget (deferred initialization)."""
         try:
@@ -341,11 +353,13 @@ class UTMDashboard(App):
 
     def action_toggle_system_info(self) -> None:
         """Toggle visibility of the System Information widget."""
+        from dashboard.widgets.system_info import CompactSystemInfo
         system_info = self.query_one(CompactSystemInfo)
         system_info.display = not system_info.display
 
     def action_refresh(self) -> None:
         """Refresh only CompactSystemInfo and the active tab."""
+        from dashboard.widgets.system_info import CompactSystemInfo
         # Always refresh system info panel
         try:
             self.query_one(CompactSystemInfo).update_data()
@@ -433,6 +447,7 @@ class UTMDashboard(App):
 
     def watch_update_interval(self, new_interval: int) -> None:
         """React to interval changes - update system info display and widgets."""
+        from dashboard.widgets.system_info import CompactSystemInfo
         try:
             system_info = self.query_one(CompactSystemInfo)
             system_info.update_interval_display(new_interval)

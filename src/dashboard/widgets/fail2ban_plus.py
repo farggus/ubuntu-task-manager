@@ -67,6 +67,7 @@ class Fail2banPlusTab(Vertical, can_focus=True):
         self._db: Optional[AttacksDatabase] = None
         self._f2b_client: Optional[Fail2banClient] = None
         self._last_update: Optional[datetime] = None
+        self._data_loaded: bool = False
 
     def compose(self) -> ComposeResult:
         """Build the UI."""
@@ -75,10 +76,16 @@ class Fail2banPlusTab(Vertical, can_focus=True):
             yield Input(placeholder="Search IP/jail...", id="f2b_plus_search")
 
     def on_mount(self) -> None:
-        """Load initial data."""
-        self._db = AttacksDatabase()
-        self._f2b_client = Fail2banClient()
-        self._refresh_data()
+        """Setup UI (no data loading - deferred to on_show)."""
+        pass  # Data loading moved to on_show for lazy initialization
+
+    def on_show(self) -> None:
+        """Load data when tab becomes visible (lazy loading)."""
+        if not self._data_loaded:
+            self._data_loaded = True
+            self._db = AttacksDatabase()
+            self._f2b_client = Fail2banClient()
+            self._refresh_data()
 
     def action_open_db_modal(self) -> None:
         """Open the F2B Database Manager modal."""

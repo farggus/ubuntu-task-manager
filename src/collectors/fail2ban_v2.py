@@ -280,12 +280,11 @@ class Fail2banV2Collector(BaseCollector):
             duration = self._get_jail_bantime(jail)
             self._db.record_ban(ip, jail, duration=duration)
             stats['bans'] += 1
-            logger.debug(f"Recorded ban: {ip} in {jail}")
+            # Note: individual event logging removed for performance (summary logged in collect())
 
         elif event_type == 'unban':
             self._db.record_unban(ip, jail)
             stats['unbans'] += 1
-            logger.debug(f"Recorded unban: {ip} from {jail}")
 
         elif event_type == 'found':
             self._db.record_attempt(ip, jail)

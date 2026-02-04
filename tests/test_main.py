@@ -21,10 +21,11 @@ class TestMainModule(unittest.TestCase):
         import main
         self.assertTrue(hasattr(main, 'setup_logging'))
 
-    def test_has_utm_dashboard_class(self):
-        """Test that main module has UTMDashboard class."""
-        import main
-        self.assertTrue(hasattr(main, 'UTMDashboard'))
+    def test_utm_dashboard_importable(self):
+        """Test that UTMDashboard can be imported from dashboard module."""
+        # UTMDashboard is lazy-imported in main() for startup performance
+        from dashboard import UTMDashboard
+        self.assertIsNotNone(UTMDashboard)
 
 
 class TestConst(unittest.TestCase):
