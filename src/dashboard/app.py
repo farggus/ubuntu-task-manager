@@ -322,6 +322,8 @@ class UTMDashboard(App):
     def _init_processes_tab(self) -> None:
         """Replace placeholder Processes tab with actual widget (deferred initialization)."""
         try:
+            from dashboard.widgets.processes import ProcessesTab
+
             tabbed_content = self.query_one(TabbedContent)
             processes_pane = tabbed_content.get_pane("processes")
 
