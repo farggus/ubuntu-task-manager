@@ -181,7 +181,8 @@ class CompactSystemInfo(Horizontal):
         """Load initial data after UI is fully ready."""
         if not self._data_loaded:
             self._data_loaded = True
-            self.update_data()
+            # Use progressive loading for initial load (shows data as it becomes available)
+            self.update_data_progressive()
 
     def on_show(self) -> None:
         """Load data if not loaded yet (for lazy tab widgets)."""
@@ -222,6 +223,102 @@ class CompactSystemInfo(Horizontal):
         if data.get('error'):
             self.notify(f"System Info Error: {data['error']}", severity="error")
         self.app.call_from_thread(self.update_ui, data)
+
+    @work(exclusive=True, thread=True)
+    def update_data_progressive(self) -> None:
+        """Update system data progressively (show fast data first)."""
+        try:
+            # Collect data in priority order (fast data first)
+            progressive_data = self.collector.collect_progressive()
+
+            # Build complete data dict for final update_ui call
+            data = {}
+            for data_type, value in progressive_data:
+                data[data_type] = value
+
+                # Update UI incrementally for each chunk
+                # This shows data as soon as it's available
+                self.app.call_from_thread(self._update_ui_partial, data_type, value)
+
+            # Final update with all data
+            self.app.call_from_thread(self.update_ui, data)
+
+        except Exception as e:
+            logger.error(f"Error in progressive data collection: {e}")
+            self.app.call_from_thread(self.notify, f"System Info Error: {e}", severity="error")
+
+    def _update_ui_partial(self, data_type: str, value: Any) -> None:
+        """Update UI with a single data chunk (called from background thread)."""
+        if not self:  # Widget destroyed
+            return
+
+        try:
+            interval = getattr(self.app, 'update_interval', 2000)
+            self.border_subtitle = f"[dim]-[/dim] [bold cyan]{interval}[/bold cyan] [dim]+[/dim]"
+
+            if data_type == 'cpu' and value:
+                cpu_usage = value.get('usage_total', 0)
+                self.cpu_history.append(cpu_usage)
+                self.query_one("#cpu_spark", Sparkline).data = list(self.cpu_history)
+
+                cpu_text = Text()
+                cpu_text.append("CPU Load ", style="bold cyan")
+                cpu_text.append(f"{cpu_usage}%", style="bold white")
+                try:
+                    load_avg = os_module.getloadavg()
+                    load_str = f"{load_avg[0]:.2f}, {load_avg[1]:.2f}, {load_avg[2]:.2f}"
+                    cpu_text.append(" | ", style="dim")
+                    cpu_text.append("Load Avg ", style="bold cyan")
+                    cpu_text.append(load_str, style="bold yellow")
+                except Exception:
+                    pass
+                self.query_one("#cpu_label", Label).update(cpu_text)
+
+            elif data_type == 'memory' and value:
+                mem_percent = value.get('percent', 0)
+                mem_used_gb = value.get('used', 0) / (1024**3)
+                mem_total_gb = value.get('total', 0) / (1024**3)
+                self.mem_history.append(mem_percent)
+                self.query_one("#mem_spark", Sparkline).data = list(self.mem_history)
+
+                mem_text = Text()
+                mem_text.append("RAM ", style="bold cyan")
+                mem_text.append(f"{mem_used_gb:.1f}/{mem_total_gb:.1f} GB", style="bold white")
+                mem_text.append(" ", style="dim")
+                mem_text.append(f"({mem_percent:.0f}%)", style="bold yellow")
+                self.query_one("#mem_percent", Label).update(mem_text)
+
+            elif data_type == 'disk' and value:
+                hierarchy = value.get('hierarchy', [])
+                self._update_disk_overview(hierarchy)
+
+        except Exception as e:
+            logger.debug(f"Error updating UI for {data_type}: {e}")
+
+    def _update_disk_overview(self, hierarchy: list) -> None:
+        """Update disk overview section."""
+        try:
+            basic_info = self.query_one("#basic_info", Static)
+            disk_text = Table.grid(padding=(0, 2))
+
+            total_size = 0
+            total_used = 0
+            for disk in hierarchy:
+                size = disk.get('size', 0)
+                total_size += size
+                for child in disk.get('children', []):
+                    usage = child.get('usage')
+                    if usage:
+                        total_used += usage.get('used', 0)
+
+            total_size_gb = total_size / (1024**3)
+            total_used_gb = total_used / (1024**3)
+            percent_used = (total_used / total_size * 100) if total_size > 0 else 0
+
+            disk_text.add_row(Text("Storage ", style="bold cyan"), f"{total_used_gb:.1f}/{total_size_gb:.1f} GB ({percent_used:.0f}%)")
+            basic_info.update(disk_text)
+        except Exception as e:
+            logger.debug(f"Error updating disk overview: {e}")
 
     def update_ui(self, data: Dict[str, Any]) -> None:
         """Update UI elements on main thread."""

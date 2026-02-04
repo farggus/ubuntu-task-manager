@@ -793,6 +793,49 @@ class TestServiceCaching(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
 
+class TestProgressiveCollection(unittest.TestCase):
+    """Tests for progressive data collection."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def test_collect_progressive_returns_list(self):
+        """Test that collect_progressive returns a list."""
+        result = self.collector.collect_progressive()
+        self.assertIsInstance(result, list)
+
+    def test_collect_progressive_has_tuples(self):
+        """Test that collect_progressive returns list of tuples."""
+        result = self.collector.collect_progressive()
+        self.assertTrue(all(isinstance(item, tuple) and len(item) == 2 for item in result))
+
+    def test_collect_progressive_includes_fast_data_first(self):
+        """Test that fast data comes before slow data."""
+        result = self.collector.collect_progressive()
+        data_types = [item[0] for item in result]
+
+        # Fast data should come first
+        fast_data = ['timestamp', 'os', 'hostname', 'uptime']
+        fast_indices = [data_types.index(t) for t in fast_data if t in data_types]
+        self.assertTrue(all(fast_indices[i] <= fast_indices[i+1] for i in range(len(fast_indices)-1)))
+
+    def test_collect_progressive_includes_all_data(self):
+        """Test that progressive collection includes all expected data types."""
+        result = self.collector.collect_progressive()
+        data_types = {item[0] for item in result}
+
+        expected = {'timestamp', 'os', 'hostname', 'uptime', 'cpu', 'memory', 'network',
+                    'users', 'processes', 'services_stats', 'packages', 'disk'}
+
+        self.assertTrue(expected.issubset(data_types))
+
+    def test_collect_progressive_data_not_empty(self):
+        """Test that collected data is not empty."""
+        result = self.collector.collect_progressive()
+        # Should have at least 10 data items
+        self.assertGreaterEqual(len(result), 10)
+
+
 class TestDiskHierarchyCaching(unittest.TestCase):
     """Tests for disk hierarchy background caching."""
 

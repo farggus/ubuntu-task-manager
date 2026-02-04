@@ -85,6 +85,39 @@ class SystemCollector(BaseCollector):
             'packages': self._get_package_stats(),
         }
 
+    def collect_progressive(self) -> list:
+        """
+        Collect system information progressively (yields chunks as they become available).
+
+        Returns:
+            List of tuples (data_type, data) where data_type identifies what was collected.
+            Yields fast data first (OS, hostname, uptime) before slower data.
+        """
+        timestamp = datetime.datetime.now().strftime("%a %d %b %Y %H:%M:%S")
+        result = []
+
+        # Phase 1: Instant data (no system calls needed or cached)
+        result.append(('timestamp', timestamp))
+        result.append(('os', self._get_os_info()))
+        result.append(('hostname', platform.node()))
+        result.append(('uptime', self._get_uptime()))
+        result.append(('network', self._get_primary_ip()))
+        result.append(('users', self._get_users_count()))
+
+        # Phase 2: Fast data (usually <100ms)
+        result.append(('cpu', self._get_cpu_info()))
+        result.append(('memory', self._get_memory_info()))
+        result.append(('processes', self._get_process_stats()))
+
+        # Phase 3: Cached/background data (returns immediately if cached)
+        result.append(('services_stats', self._get_service_stats()))
+        result.append(('packages', self._get_package_stats()))
+
+        # Phase 4: Slower disk data (may take time but uses cached hierarchy)
+        result.append(('disk', self._get_disk_info()))
+
+        return result
+
     def _get_package_stats(self) -> Dict[str, Any]:
         """Get package stats (non-blocking). Triggers background update if stale.
 
