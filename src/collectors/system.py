@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 
 import psutil
 
-from const import DISK_CACHE_FILE
+from const import DISK_CACHE_FILE, DISK_HIERARCHY_CACHE_FILE, PACKAGE_STATS_CACHE_FILE, SERVICE_STATS_CACHE_FILE
 from utils.binaries import APT, DPKG_QUERY, LSBLK, SMARTCTL, SUDO, SYSTEMCTL
 from utils.logger import get_logger
 from utils.process_cache import get_process_stats
@@ -30,8 +30,27 @@ class SystemCollector(BaseCollector):
         super().__init__(config)
         self._last_disk_io = {}
         self._last_io_time = time.time()
-        self._pkg_cache = {'total': 0, 'updates': 0}
-        self._pkg_cache_time = 0
+
+        # Package stats collection (non-blocking)
+        self._pkg_cache: Dict[str, Any] = {}
+        self._pkg_cache_time: float = 0
+        self._pkg_update_lock = threading.Lock()
+        self._pkg_update_in_progress = False
+        self._pkg_persistent_cache: Dict[str, Any] = self._load_package_cache()
+
+        # Service stats collection (non-blocking)
+        self._service_cache: Dict[str, int] = {}
+        self._service_cache_time: float = 0
+        self._service_update_lock = threading.Lock()
+        self._service_update_in_progress = False
+        self._service_persistent_cache: Dict[str, int] = self._load_service_cache()
+
+        # Disk hierarchy collection (non-blocking)
+        self._disk_hierarchy_cache: list = []
+        self._disk_hierarchy_cache_time: float = 0
+        self._disk_hierarchy_update_lock = threading.Lock()
+        self._disk_hierarchy_update_in_progress = False
+        self._disk_hierarchy_persistent_cache: list = self._load_disk_hierarchy_cache()
 
         # SMART data collection (non-blocking)
         self._smart_cache: Dict[str, Any] = {}
@@ -67,12 +86,92 @@ class SystemCollector(BaseCollector):
         }
 
     def _get_package_stats(self) -> Dict[str, Any]:
-        """Get total packages and updates count/list (cached for 30 min)."""
-        now = time.time()
-        # Update cache every 30 minutes (1800 seconds)
-        if now - self._pkg_cache_time < 1800 and self._pkg_cache['total'] > 0:
-            return self._pkg_cache
+        """Get package stats (non-blocking). Triggers background update if stale.
 
+        Returns cached data from persistent storage if in-memory cache is empty.
+        This allows showing package counts immediately on startup.
+        """
+        now = time.time()
+        cache_age = now - self._pkg_cache_time
+
+        # If cache is stale (>30 min), trigger background update
+        if cache_age > 1800:
+            self._trigger_package_update_background()
+
+        # If in-memory cache is empty, try to use persistent cache
+        if not self._pkg_cache and self._pkg_persistent_cache:
+            return self._pkg_persistent_cache
+
+        # Return cached data or empty defaults
+        return self._pkg_cache or {'total': 0, 'updates': 0, 'upgradable_list': [], 'all_packages': []}
+
+    def _trigger_package_update_background(self) -> None:
+        """Start background package data collection if not already running."""
+        with self._pkg_update_lock:
+            if self._pkg_update_in_progress:
+                return
+            self._pkg_update_in_progress = True
+
+        # Run in background thread
+        thread = threading.Thread(target=self._update_package_stats_background, daemon=True)
+        thread.start()
+
+    def _update_package_stats_background(self) -> None:
+        """Background worker for package stats collection."""
+        try:
+            logger.debug("Starting background package stats collection")
+            start_time = time.time()
+
+            data = self._collect_package_stats()
+
+            # Update cache atomically
+            self._pkg_cache = data
+            self._pkg_cache_time = time.time()
+
+            # Persist package cache for faster startup next time
+            self._save_package_cache()
+
+            duration = time.time() - start_time
+            logger.debug(f"Package stats collection completed in {duration:.1f}s")
+
+        except Exception as e:
+            logger.error(f"Background package collection failed: {e}")
+        finally:
+            with self._pkg_update_lock:
+                self._pkg_update_in_progress = False
+
+    def _load_package_cache(self) -> Dict[str, Any]:
+        """Load package cache from persistent storage."""
+        if not os.path.exists(PACKAGE_STATS_CACHE_FILE):
+            return {}
+
+        try:
+            with open(PACKAGE_STATS_CACHE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            logger.debug(f"Loaded package cache with {data.get('total', 0)} packages")
+            return data
+
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to load package cache: {e}")
+            return {}
+
+    def _save_package_cache(self) -> None:
+        """Save package cache to persistent storage (atomic write)."""
+        try:
+            # Ensure cache directory exists
+            cache_dir = os.path.dirname(PACKAGE_STATS_CACHE_FILE)
+            os.makedirs(cache_dir, exist_ok=True)
+
+            tmp_path = PACKAGE_STATS_CACHE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(self._pkg_cache, f, indent=2)
+            os.replace(tmp_path, PACKAGE_STATS_CACHE_FILE)
+            logger.debug("Saved package cache")
+        except (IOError, OSError) as e:
+            logger.warning(f"Failed to save package cache: {e}")
+
+    def _collect_package_stats(self) -> Dict[str, Any]:
+        """Collect package statistics (blocking operation, run in background thread)."""
         total = 0
         updates = 0
         upgradable_list = []
@@ -173,17 +272,100 @@ class SystemCollector(BaseCollector):
         except Exception:
             pass
 
-        self._pkg_cache = {
+        return {
             'total': total,
             'updates': updates,
             'upgradable_list': upgradable_list,
             'all_packages': all_packages
         }
-        self._pkg_cache_time = now
-        return self._pkg_cache
 
     def _get_service_stats(self) -> Dict[str, int]:
-        """Get systemd service statistics (failed and active counts).
+        """Get service stats (non-blocking). Triggers background update if stale.
+
+        Returns cached data from persistent storage if in-memory cache is empty.
+        This allows showing service counts immediately on startup.
+        """
+        now = time.time()
+        cache_age = now - self._service_cache_time
+
+        # If cache is stale (>60 sec), trigger background update
+        if cache_age > 60:
+            self._trigger_service_update_background()
+
+        # If in-memory cache is empty, try to use persistent cache
+        if not self._service_cache and self._service_persistent_cache:
+            return self._service_persistent_cache
+
+        # Return cached data or empty defaults
+        return self._service_cache or {'failed': 0, 'active': 0}
+
+    def _trigger_service_update_background(self) -> None:
+        """Start background service stats collection if not already running."""
+        with self._service_update_lock:
+            if self._service_update_in_progress:
+                return
+            self._service_update_in_progress = True
+
+        # Run in background thread
+        thread = threading.Thread(target=self._update_service_stats_background, daemon=True)
+        thread.start()
+
+    def _update_service_stats_background(self) -> None:
+        """Background worker for service stats collection."""
+        try:
+            logger.debug("Starting background service stats collection")
+            start_time = time.time()
+
+            data = self._collect_service_stats()
+
+            # Update cache atomically
+            self._service_cache = data
+            self._service_cache_time = time.time()
+
+            # Persist service cache for faster startup next time
+            self._save_service_cache()
+
+            duration = time.time() - start_time
+            logger.debug(f"Service stats collection completed in {duration:.1f}s")
+
+        except Exception as e:
+            logger.error(f"Background service collection failed: {e}")
+        finally:
+            with self._service_update_lock:
+                self._service_update_in_progress = False
+
+    def _load_service_cache(self) -> Dict[str, int]:
+        """Load service cache from persistent storage."""
+        if not os.path.exists(SERVICE_STATS_CACHE_FILE):
+            return {}
+
+        try:
+            with open(SERVICE_STATS_CACHE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            logger.debug(f"Loaded service cache with {data.get('active', 0)} active services")
+            return data
+
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to load service cache: {e}")
+            return {}
+
+    def _save_service_cache(self) -> None:
+        """Save service cache to persistent storage (atomic write)."""
+        try:
+            # Ensure cache directory exists
+            cache_dir = os.path.dirname(SERVICE_STATS_CACHE_FILE)
+            os.makedirs(cache_dir, exist_ok=True)
+
+            tmp_path = SERVICE_STATS_CACHE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(self._service_cache, f, indent=2)
+            os.replace(tmp_path, SERVICE_STATS_CACHE_FILE)
+            logger.debug("Saved service cache")
+        except (IOError, OSError) as e:
+            logger.warning(f"Failed to save service cache: {e}")
+
+    def _collect_service_stats(self) -> Dict[str, int]:
+        """Collect service statistics (blocking operation, run in background thread).
 
         Uses single systemctl call with --all flag and counts statuses in Python.
         Output format: UNIT LOAD ACTIVE SUB DESCRIPTION
@@ -295,17 +477,104 @@ class SystemCollector(BaseCollector):
         }
 
     def _get_disk_info(self) -> Dict[str, Any]:
-        """Get disk information with full hierarchy like lsblk (disk → part → lvm)."""
-        mountpoints = self._get_mountpoints()
-        smart_cache = self._get_smart_cache()
-        hierarchy = self._parse_disk_hierarchy(mountpoints, smart_cache)
-        hierarchy.sort(key=lambda d: (0 if d['name'].startswith('nvme') else 1, d['name']))
+        """Get disk information with full hierarchy like lsblk (disk → part → lvm).
+
+        Triggers background update of hierarchy if cache is stale.
+        Returns cached hierarchy immediately while background update runs.
+        """
+        now = time.time()
+        cache_age = now - self._disk_hierarchy_cache_time
+
+        # If cache is stale (>5 min), trigger background update
+        if cache_age > 300:
+            self._trigger_disk_hierarchy_update_background()
+
+        # Get hierarchy: use in-memory cache if available, fallback to persistent, then parse
+        if self._disk_hierarchy_cache:
+            hierarchy = self._disk_hierarchy_cache
+        elif self._disk_hierarchy_persistent_cache:
+            hierarchy = self._disk_hierarchy_persistent_cache
+        else:
+            # No cache available, collect synchronously (first startup)
+            mountpoints = self._get_mountpoints()
+            smart_cache = self._get_smart_cache()
+            hierarchy = self._parse_disk_hierarchy(mountpoints, smart_cache)
+
+        hierarchy_copy = list(hierarchy)
+        hierarchy_copy.sort(key=lambda d: (0 if d['name'].startswith('nvme') else 1, d['name']))
 
         return {
-            'hierarchy': hierarchy,
-            'partitions': self._build_partitions_list(hierarchy),
+            'hierarchy': hierarchy_copy,
+            'partitions': self._build_partitions_list(hierarchy_copy),
             'io': self._get_io_stats(),
         }
+
+    def _trigger_disk_hierarchy_update_background(self) -> None:
+        """Start background disk hierarchy collection if not already running."""
+        with self._disk_hierarchy_update_lock:
+            if self._disk_hierarchy_update_in_progress:
+                return
+            self._disk_hierarchy_update_in_progress = True
+
+        # Run in background thread
+        thread = threading.Thread(target=self._update_disk_hierarchy_background, daemon=True)
+        thread.start()
+
+    def _update_disk_hierarchy_background(self) -> None:
+        """Background worker for disk hierarchy collection."""
+        try:
+            logger.debug("Starting background disk hierarchy collection")
+            start_time = time.time()
+
+            mountpoints = self._get_mountpoints()
+            smart_cache = self._get_smart_cache()
+            hierarchy = self._parse_disk_hierarchy(mountpoints, smart_cache)
+
+            # Update cache atomically
+            self._disk_hierarchy_cache = hierarchy
+            self._disk_hierarchy_cache_time = time.time()
+
+            # Persist disk hierarchy cache for faster startup next time
+            self._save_disk_hierarchy_cache()
+
+            duration = time.time() - start_time
+            logger.debug(f"Disk hierarchy collection completed in {duration:.1f}s for {len(hierarchy)} disks")
+
+        except Exception as e:
+            logger.error(f"Background disk hierarchy collection failed: {e}")
+        finally:
+            with self._disk_hierarchy_update_lock:
+                self._disk_hierarchy_update_in_progress = False
+
+    def _load_disk_hierarchy_cache(self) -> list:
+        """Load disk hierarchy cache from persistent storage."""
+        if not os.path.exists(DISK_HIERARCHY_CACHE_FILE):
+            return []
+
+        try:
+            with open(DISK_HIERARCHY_CACHE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            logger.debug(f"Loaded disk hierarchy cache for {len(data)} disks")
+            return data
+
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to load disk hierarchy cache: {e}")
+            return []
+
+    def _save_disk_hierarchy_cache(self) -> None:
+        """Save disk hierarchy cache to persistent storage (atomic write)."""
+        try:
+            # Ensure cache directory exists
+            cache_dir = os.path.dirname(DISK_HIERARCHY_CACHE_FILE)
+            os.makedirs(cache_dir, exist_ok=True)
+
+            tmp_path = DISK_HIERARCHY_CACHE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(self._disk_hierarchy_cache, f, indent=2)
+            os.replace(tmp_path, DISK_HIERARCHY_CACHE_FILE)
+            logger.debug(f"Saved disk hierarchy cache for {len(self._disk_hierarchy_cache)} disks")
+        except (IOError, OSError) as e:
+            logger.warning(f"Failed to save disk hierarchy cache: {e}")
 
     def _get_mountpoints(self) -> Dict[str, list]:
         """Get mountpoints and filesystem types from psutil."""

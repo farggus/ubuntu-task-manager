@@ -692,5 +692,166 @@ class TestSmartPersistence(unittest.TestCase):
         self.assertIsNone(result['/dev/sdb']['device_type'])
 
 
+class TestPackageCaching(unittest.TestCase):
+    """Tests for package stats background caching."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def tearDown(self):
+        """Clean up cache files after tests."""
+        import os
+        from const import PACKAGE_STATS_CACHE_FILE
+        if os.path.exists(PACKAGE_STATS_CACHE_FILE):
+            try:
+                os.remove(PACKAGE_STATS_CACHE_FILE)
+            except OSError:
+                pass
+
+    def test_load_package_cache_missing_file(self):
+        """Test loading package cache when file doesn't exist."""
+        import os
+        from const import PACKAGE_STATS_CACHE_FILE
+        # Ensure file doesn't exist
+        if os.path.exists(PACKAGE_STATS_CACHE_FILE):
+            os.remove(PACKAGE_STATS_CACHE_FILE)
+        result = self.collector._load_package_cache()
+        self.assertEqual(result, {})
+
+    def test_get_package_stats_returns_dict(self):
+        """Test that _get_package_stats returns a dictionary."""
+        result = self.collector._get_package_stats()
+        self.assertIsInstance(result, dict)
+
+    def test_get_package_stats_has_total(self):
+        """Test that package stats includes total key."""
+        result = self.collector._get_package_stats()
+        self.assertIn('total', result)
+
+    def test_get_package_stats_non_blocking(self):
+        """Test that _get_package_stats doesn't block on first call."""
+        # Should return immediately (possibly empty or cached)
+        import time
+        start = time.time()
+        result = self.collector._get_package_stats()
+        elapsed = time.time() - start
+        # Should be very fast (< 1 second for cached/empty return)
+        self.assertLess(elapsed, 1.0)
+        self.assertIsInstance(result, dict)
+
+
+class TestServiceCaching(unittest.TestCase):
+    """Tests for service stats background caching."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def tearDown(self):
+        """Clean up cache files after tests."""
+        import os
+        from const import SERVICE_STATS_CACHE_FILE
+        if os.path.exists(SERVICE_STATS_CACHE_FILE):
+            try:
+                os.remove(SERVICE_STATS_CACHE_FILE)
+            except OSError:
+                pass
+
+    def test_load_service_cache_missing_file(self):
+        """Test loading service cache when file doesn't exist."""
+        import os
+        from const import SERVICE_STATS_CACHE_FILE
+        # Ensure file doesn't exist
+        if os.path.exists(SERVICE_STATS_CACHE_FILE):
+            os.remove(SERVICE_STATS_CACHE_FILE)
+        result = self.collector._load_service_cache()
+        self.assertEqual(result, {})
+
+    def test_get_service_stats_returns_dict(self):
+        """Test that _get_service_stats returns a dictionary."""
+        result = self.collector._get_service_stats()
+        self.assertIsInstance(result, dict)
+
+    def test_get_service_stats_has_failed(self):
+        """Test that service stats includes failed key."""
+        result = self.collector._get_service_stats()
+        self.assertIn('failed', result)
+
+    def test_get_service_stats_has_active(self):
+        """Test that service stats includes active key."""
+        result = self.collector._get_service_stats()
+        self.assertIn('active', result)
+
+    def test_get_service_stats_non_blocking(self):
+        """Test that _get_service_stats doesn't block on first call."""
+        # Should return immediately (possibly empty or cached)
+        import time
+        start = time.time()
+        result = self.collector._get_service_stats()
+        elapsed = time.time() - start
+        # Should be very fast (< 1 second for cached/empty return)
+        self.assertLess(elapsed, 1.0)
+        self.assertIsInstance(result, dict)
+
+
+class TestDiskHierarchyCaching(unittest.TestCase):
+    """Tests for disk hierarchy background caching."""
+
+    def setUp(self):
+        self.collector = SystemCollector()
+
+    def tearDown(self):
+        """Clean up cache files after tests."""
+        import os
+        from const import DISK_HIERARCHY_CACHE_FILE
+        if os.path.exists(DISK_HIERARCHY_CACHE_FILE):
+            try:
+                os.remove(DISK_HIERARCHY_CACHE_FILE)
+            except OSError:
+                pass
+
+    def test_load_disk_hierarchy_cache_missing_file(self):
+        """Test loading disk hierarchy cache when file doesn't exist."""
+        import os
+        from const import DISK_HIERARCHY_CACHE_FILE
+        # Ensure file doesn't exist
+        if os.path.exists(DISK_HIERARCHY_CACHE_FILE):
+            os.remove(DISK_HIERARCHY_CACHE_FILE)
+        result = self.collector._load_disk_hierarchy_cache()
+        self.assertEqual(result, [])
+
+    def test_get_disk_info_returns_dict(self):
+        """Test that _get_disk_info returns a dictionary."""
+        result = self.collector._get_disk_info()
+        self.assertIsInstance(result, dict)
+
+    def test_disk_info_has_hierarchy(self):
+        """Test that disk info includes hierarchy key."""
+        result = self.collector._get_disk_info()
+        self.assertIn('hierarchy', result)
+
+    def test_disk_info_has_partitions(self):
+        """Test that disk info includes partitions key."""
+        result = self.collector._get_disk_info()
+        self.assertIn('partitions', result)
+
+    def test_disk_info_hierarchy_is_list(self):
+        """Test that hierarchy is a list."""
+        result = self.collector._get_disk_info()
+        self.assertIsInstance(result['hierarchy'], list)
+
+    def test_get_disk_info_non_blocking(self):
+        """Test that _get_disk_info returns quickly on subsequent calls."""
+        # First call should populate cache
+        _ = self.collector._get_disk_info()
+        # Second call should use cache
+        import time
+        start = time.time()
+        result = self.collector._get_disk_info()
+        elapsed = time.time() - start
+        # Should be very fast (< 1 second)
+        self.assertLess(elapsed, 1.0)
+        self.assertIsInstance(result, dict)
+
+
 if __name__ == '__main__':
     unittest.main()
