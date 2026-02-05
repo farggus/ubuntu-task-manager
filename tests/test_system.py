@@ -503,7 +503,25 @@ class TestSmartNonBlocking(unittest.TestCase):
     """Tests for non-blocking SMART data collection."""
 
     def setUp(self):
+        import os
+        from const import DISK_CACHE_FILE
+        # Clean up cache file before each test for isolation
+        if os.path.exists(DISK_CACHE_FILE):
+            os.unlink(DISK_CACHE_FILE)
         self.collector = SystemCollector()
+
+    def tearDown(self):
+        import os
+        import time
+        from const import DISK_CACHE_FILE
+        # Wait for any background threads to complete
+        for _ in range(20):  # Max 2 seconds
+            if not self.collector._smart_update_in_progress:
+                break
+            time.sleep(0.1)
+        # Clean up cache file
+        if os.path.exists(DISK_CACHE_FILE):
+            os.unlink(DISK_CACHE_FILE)
 
     def test_smart_cache_initialized(self):
         """Test SMART cache is initialized in __init__."""
@@ -605,11 +623,19 @@ class TestSmartPersistence(unittest.TestCase):
         if os.path.exists(DISK_CACHE_FILE):
             os.unlink(DISK_CACHE_FILE)
         self.collector = SystemCollector()
+        # Prevent background SMART collection from interfering with tests
+        self.collector._smart_cache_time = float('inf')
 
     def tearDown(self):
         import os
+        import time
         from const import DISK_CACHE_FILE
-        # Clean up after each test
+        # Wait for any background threads to complete
+        for _ in range(20):  # Max 2 seconds
+            if not self.collector._smart_update_in_progress:
+                break
+            time.sleep(0.1)
+        # Clean up cache file
         if os.path.exists(DISK_CACHE_FILE):
             os.unlink(DISK_CACHE_FILE)
 
