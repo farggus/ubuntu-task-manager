@@ -26,7 +26,21 @@ def setup_logging(log_file: str = LOG_FILE, level: int = logging.INFO) -> None:
     if log_dest == "stdout":
         handler = logging.StreamHandler(sys.stdout)
     else:
-        handler = RotatingFileHandler(log_file, maxBytes=1 * 1024 * 1024, backupCount=10, encoding="utf-8")  # 1 MB
+        try:
+            handler = RotatingFileHandler(log_file, maxBytes=1 * 1024 * 1024, backupCount=10, encoding="utf-8")  # 1 MB
+        except PermissionError:
+            print(
+                f"\n\033[1;31mError:\033[0m Cannot write to log file: {log_file}\n"
+                f"\n"
+                f"The log file is owned by another user (likely root from a previous sudo run).\n"
+                f"\n"
+                f"\033[1mSolutions:\033[0m\n"
+                f"  1. Run with sudo:  \033[32msudo ./scripts/run.sh\033[0m\n"
+                f"  2. Fix ownership:  \033[32msudo chown $USER:$USER {log_file}*\033[0m\n"
+                f"  3. Use stdout:     \033[32mLOG_DEST=stdout python src/main.py\033[0m\n",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # Import JsonFormatter if available and requested
     json_formatter = None

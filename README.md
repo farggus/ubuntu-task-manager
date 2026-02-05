@@ -80,33 +80,59 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Permissions Setup (Optional)
+### 2. Running With or Without Sudo
 
-Some functions require root privileges:
-- Open ports info with processes
-- Firewall rules (iptables)
-- System cron files
-- Service management (start/stop/restart)
-- Docker container management
-- Apt upgrade
+UTM can run **both with and without root privileges**. Without sudo, some tabs will show limited information:
 
-You can run with `sudo` or configure sudo without password for specific commands.
+| Tab | Without sudo | With sudo |
+|-----|--------------|-----------|
+| `1` Processes | ✅ Full access | ✅ Full access |
+| `2` Services | ✅ View only | ✅ View + manage (start/stop/restart) |
+| `3` Packages | ✅ View only | ✅ View + upgrade |
+| `4` Containers | ⚠️ Requires `docker` group | ✅ Full access |
+| `5` Tasks | ⚠️ Current user cron only | ✅ All users cron + system cron |
+| `6` Network | ⚠️ No process info on ports, no firewall rules | ✅ Full access (ports, iptables/nftables) |
+| `F` Fail2ban | ❌ No access | ✅ Full access |
+| `Shift+F` Fail2ban+ | ❌ No access | ✅ Full access |
+| `7` Users | ✅ Full access | ✅ Full access |
+| `8` Disks | ⚠️ No SMART data | ✅ Full access (SMART via smartctl) |
+| `0` Logging | ✅ Full access | ✅ Full access |
+
+**Recommendations:**
+- For **full monitoring**: run with `sudo ./scripts/run.sh`
+- For **basic monitoring** (processes, services view, users): run without sudo
+- For **Docker without sudo**: add your user to the `docker` group: `sudo usermod -aG docker $USER`
 
 ## Usage
 
-### Basic Start
+### Basic Start (Limited Mode)
 ```bash
+source venv/bin/activate
 python src/main.py
 ```
+Runs with current user privileges. Some tabs will have limited data (see permissions table above).
+
+### Full Access (Recommended)
+```bash
+sudo ./scripts/run.sh
+```
+Runs with root privileges for complete system monitoring.
 
 ### With Custom Configuration
 ```bash
 python src/main.py --config /path/to/custom-config.yaml
+# or with sudo
+sudo ./scripts/run.sh --config /path/to/custom-config.yaml
+```
+
+### Logging to stdout (useful without sudo)
+```bash
+LOG_DEST=stdout python src/main.py
 ```
 
 ### Helper Scripts
 Use the scripts in `scripts/` for convenience:
-- `scripts/run.sh`: Run the application
+- `scripts/run.sh`: Run the application (use with `sudo` for full access)
 - `scripts/install.sh`: Install dependencies
 - `scripts/reinstall.sh`: Reinstall venv
 - `scripts/uninstall.sh`: Uninstall
