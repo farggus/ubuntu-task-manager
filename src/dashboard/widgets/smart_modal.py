@@ -52,10 +52,8 @@ class SmartModal(ModalScreen):
 
     def on_mount(self) -> None:
         """Fetch SMART report when the modal is mounted."""
-        self.query_one(RichLog).write(
-            f"""[dim]Fetching SMART report for {self.disk_device}...
-This may take a moment.[/dim]"""
-        )
+        self.query_one(RichLog).write(f"""[dim]Fetching SMART report for {self.disk_device}...
+This may take a moment.[/dim]""")
         self.fetch_smart_report()
 
     @work(thread=True, exclusive=True)
