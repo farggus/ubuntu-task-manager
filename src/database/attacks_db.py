@@ -237,13 +237,14 @@ class AttacksDatabase:
     # Event Recording
     # =========================================================================
 
-    def record_attempt(self, ip: str, jail: str) -> None:
+    def record_attempt(self, ip: str, jail: str, timestamp: Optional[str] = None) -> None:
         """
         Record a failed authentication attempt.
 
         Args:
             ip: IP address
             jail: Fail2ban jail name
+            timestamp: ISO timestamp of attempt (defaults to now)
         """
         with self._lock:
             if ip not in self._data["ips"]:
@@ -251,14 +252,30 @@ class AttacksDatabase:
                 self._data["stats"]["total_ips"] += 1
 
             record = self._data["ips"][ip]
-            record["last_seen"] = _now_iso()
+            attempt_time = timestamp or _now_iso()
+            record["last_seen"] = attempt_time
             record["last_updated"] = _now_unix()
             record["attempts"]["total"] += 1
             record["attempts"]["by_jail"][jail] = record["attempts"]["by_jail"].get(jail, 0) + 1
 
+            # Track first/last attempt
+            if not record["attempts"]["first_attempt"]:
+                record["attempts"]["first_attempt"] = attempt_time
+            record["attempts"]["last_attempt"] = attempt_time
+
+            # Store recent timestamps for pattern analysis (keep last 100)
+            if "timestamps" not in record["attempts"]:
+                record["attempts"]["timestamps"] = []
+            record["attempts"]["timestamps"].append(attempt_time)
+            if len(record["attempts"]["timestamps"]) > 100:
+                record["attempts"]["timestamps"] = record["attempts"]["timestamps"][-100:]
+
             # Track by day
-            today = datetime.now().strftime("%Y-%m-%d")
-            record["attempts"]["by_day"][today] = record["attempts"]["by_day"].get(today, 0) + 1
+            try:
+                day = attempt_time[:10]  # YYYY-MM-DD from ISO
+            except Exception:
+                day = datetime.now().strftime("%Y-%m-%d")
+            record["attempts"]["by_day"][day] = record["attempts"]["by_day"].get(day, 0) + 1
 
             # Update global stats
             self._data["stats"]["total_attempts"] += 1
@@ -597,8 +614,154 @@ class AttacksDatabase:
             self._dirty = True
 
     # =========================================================================
+    # Pattern Analysis & Threat Detection
+    # =========================================================================
+
+    def analyze_patterns(self, ip: str, findtime: int = 600) -> Dict[str, Any]:
+        """
+        Analyze attempt patterns for an IP to detect threats.
+
+        CAUGHT = was banned (threat_detected)
+        EVADING = making attempts with intervals > findtime to avoid ban (evasion_active)
+
+        Args:
+            ip: IP address to analyze
+            findtime: Fail2ban findtime in seconds (default 600 = 10 min)
+
+        Returns:
+            Dict with analysis results
+        """
+        result = {
+            "avg_interval": None,
+            "min_interval": None,
+            "max_interval": None,
+            "evasion_detected": False,
+            "evasion_active": False,
+            "threat_detected": False,
+        }
+
+        with self._lock:
+            record = self._data["ips"].get(ip)
+            if not record:
+                return result
+
+            timestamps = record.get("attempts", {}).get("timestamps", [])
+            bans_total = record.get("bans", {}).get("total", 0)
+            is_active = record.get("bans", {}).get("active", False)
+
+            # CAUGHT = was ever banned
+            if bans_total > 0:
+                result["threat_detected"] = True
+
+            # Need at least 2 timestamps for interval analysis
+            if len(timestamps) < 2:
+                self._update_analysis(ip, result)
+                return result
+
+            # Parse timestamps and calculate intervals
+            try:
+                from datetime import timezone
+                parsed = []
+                for ts in timestamps:
+                    try:
+                        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        parsed.append(dt)
+                    except (ValueError, TypeError):
+                        continue
+
+                if len(parsed) < 2:
+                    self._update_analysis(ip, result)
+                    return result
+
+                parsed.sort()
+                intervals = []
+                for i in range(1, len(parsed)):
+                    delta = (parsed[i] - parsed[i - 1]).total_seconds()
+                    intervals.append(delta)
+
+                if intervals:
+                    result["avg_interval"] = sum(intervals) / len(intervals)
+                    result["min_interval"] = min(intervals)
+                    result["max_interval"] = max(intervals)
+
+                    # EVADING detection: most intervals are just above findtime
+                    # This indicates intentional timing to avoid ban
+                    evasion_threshold = findtime * 1.1  # 10% above findtime
+                    long_intervals = [i for i in intervals if i > findtime]
+                    evasion_intervals = [i for i in intervals if findtime < i < evasion_threshold * 2]
+
+                    # If >50% intervals are in evasion range, flag as evasion
+                    if len(intervals) >= 3 and len(evasion_intervals) / len(intervals) > 0.5:
+                        result["evasion_detected"] = True
+
+                    # EVASION_ACTIVE = evasion detected and not currently banned and recent activity
+                    if result["evasion_detected"] and not is_active:
+                        last_attempt = record.get("attempts", {}).get("last_attempt")
+                        if last_attempt:
+                            try:
+                                last_dt = datetime.fromisoformat(last_attempt.replace("Z", "+00:00"))
+                                hours_ago = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
+                                if hours_ago < 24:  # Active within last 24 hours
+                                    result["evasion_active"] = True
+                            except (ValueError, TypeError):
+                                pass
+
+            except Exception as e:
+                logger.debug(f"Pattern analysis error for {ip}: {e}")
+
+            self._update_analysis(ip, result)
+            return result
+
+    def _update_analysis(self, ip: str, analysis: Dict[str, Any]) -> None:
+        """Update IP analysis fields in database."""
+        if ip in self._data["ips"]:
+            record = self._data["ips"][ip]
+            for key, value in analysis.items():
+                if key in record["analysis"]:
+                    record["analysis"][key] = value
+            record["analysis"]["last_analysis"] = _now_iso()
+            self._dirty = True
+
+    def analyze_all_patterns(self, findtime: int = 600) -> Dict[str, int]:
+        """
+        Analyze patterns for all IPs with sufficient data.
+
+        Returns:
+            Dict with counts: threats, evading, analyzed
+        """
+        stats = {"analyzed": 0, "threats": 0, "evading": 0}
+
+        with self._lock:
+            for ip in list(self._data["ips"].keys()):
+                record = self._data["ips"][ip]
+                timestamps = record.get("attempts", {}).get("timestamps", [])
+
+                # Only analyze IPs with enough data
+                if len(timestamps) >= 3 or record.get("bans", {}).get("total", 0) > 0:
+                    # Release lock for analysis
+                    pass
+
+        # Analyze outside lock to avoid long hold
+        for ip in list(self._data["ips"].keys()):
+            record = self._data["ips"].get(ip, {})
+            timestamps = record.get("attempts", {}).get("timestamps", [])
+
+            if len(timestamps) >= 3 or record.get("bans", {}).get("total", 0) > 0:
+                result = self.analyze_patterns(ip, findtime)
+                stats["analyzed"] += 1
+
+                if result.get("threat_detected"):
+                    stats["threats"] += 1
+                if result.get("evasion_active"):
+                    stats["evading"] += 1
+
+        logger.info(f"Pattern analysis complete: {stats}")
+        return stats
+
+    # =========================================================================
     # Log Position Tracking (for incremental parsing)
     # =========================================================================
+
 
     def get_log_position(self, log_file: str) -> Optional[Dict[str, Any]]:
         """Get saved position for a log file."""

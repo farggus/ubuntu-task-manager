@@ -103,6 +103,11 @@ class Fail2banV2Collector(BaseCollector):
             sync_stats = self._sync_with_fail2ban()
             result["synced_active"] = sync_stats.get("synced", 0)
 
+            # Analyze patterns for threat detection (CAUGHT/EVADING)
+            analysis_stats = self._db.analyze_all_patterns(findtime=600)
+            result["threats_detected"] = analysis_stats.get("threats", 0)
+            result["evading_detected"] = analysis_stats.get("evading", 0)
+
             # Save database
             self._db.save()
 
@@ -287,7 +292,14 @@ class Fail2banV2Collector(BaseCollector):
             stats["unbans"] += 1
 
         elif event_type == "found":
-            self._db.record_attempt(ip, jail)
+            # Convert datetime to ISO string for storage
+            ts_iso = None
+            if timestamp:
+                try:
+                    ts_iso = timestamp.isoformat()
+                except Exception:
+                    pass
+            self._db.record_attempt(ip, jail, timestamp=ts_iso)
             stats["attempts"] += 1
 
     def _get_jail_bantime(self, jail: str) -> int:
