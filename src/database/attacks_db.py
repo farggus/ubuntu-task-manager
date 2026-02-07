@@ -654,10 +654,6 @@ class AttacksDatabase:
             bans_total = record.get("bans", {}).get("total", 0)
             is_active = record.get("bans", {}).get("active", False)
 
-            # CAUGHT = was ever banned
-            if bans_total > 0:
-                result["threat_detected"] = True
-
             # Need at least 2 timestamps for interval analysis
             if len(timestamps) < 2:
                 self._update_analysis(ip, result)
