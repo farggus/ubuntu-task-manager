@@ -166,9 +166,10 @@ class Fail2banPlusTab(Vertical, can_focus=True):
                     if bans.get("total", 0) > 0 and not bans.get("active"):
                         unbanned_count += 1
 
-                    # Threats = threat_detected or evasion_active
+                    # Threats = evasion_detected (slow brute-force pattern)
+                    # This matches the original SLOW jail logic
                     analysis = data.get("analysis", {})
-                    if analysis.get("threat_detected") or analysis.get("evasion_detected"):
+                    if analysis.get("evasion_detected"):
                         threats_count += 1
 
                     # Currently evading
