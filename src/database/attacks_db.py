@@ -305,6 +305,11 @@ class AttacksDatabase:
 
             record["last_seen"] = ban_time
             record["last_updated"] = _now_unix()
+            
+            # Track fails_before_ban on FIRST ban only
+            if record["bans"]["total"] == 0:
+                record["analysis"]["fails_before_ban"] = record["attempts"]["total"]
+            
             record["bans"]["total"] += 1
             record["bans"]["active"] = True
             record["bans"]["current_jail"] = jail
@@ -684,24 +689,27 @@ class AttacksDatabase:
                     result["min_interval"] = min(intervals)
                     result["max_interval"] = max(intervals)
 
-                    # evasion_detected (threats) = slow brute-force that was NEVER banned
-                    # IP with avg_interval > findtime AND bans == 0 = successfully evading detection
                     avg_interval = result["avg_interval"]
+                    is_slow_pattern = avg_interval and avg_interval > findtime and len(intervals) >= 2
                     
-                    # Condition: slow pattern + never caught
-                    if avg_interval and avg_interval > findtime and len(intervals) >= 2 and bans_total == 0:
-                        result["evasion_detected"] = True
-                        
-                        # evasion_active (EVADING) = evasion_detected + active within 72 hours
-                        last_attempt = record.get("attempts", {}).get("last_attempt")
-                        if last_attempt:
-                            try:
-                                last_dt = datetime.fromisoformat(last_attempt.replace("Z", "+00:00"))
-                                hours_ago = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
-                                if hours_ago < 72:  # Active within last 72 hours
-                                    result["evasion_active"] = True
-                            except (ValueError, TypeError):
-                                pass
+                    if is_slow_pattern:
+                        if bans_total == 0:
+                            # evasion_detected = slow brute-force NEVER banned (active threat)
+                            result["evasion_detected"] = True
+                            
+                            # evasion_active (EVADING) = evasion_detected + active within 72 hours
+                            last_attempt = record.get("attempts", {}).get("last_attempt")
+                            if last_attempt:
+                                try:
+                                    last_dt = datetime.fromisoformat(last_attempt.replace("Z", "+00:00"))
+                                    hours_ago = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
+                                    if hours_ago < 72:
+                                        result["evasion_active"] = True
+                                except (ValueError, TypeError):
+                                    pass
+                        else:
+                            # threat_detected = slow brute-force that WAS caught (historical)
+                            result["threat_detected"] = True
 
             except Exception as e:
                 logger.debug(f"Pattern analysis error for {ip}: {e}")

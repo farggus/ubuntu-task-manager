@@ -155,6 +155,7 @@ class Fail2banPlusTab(Vertical, can_focus=True):
             unbanned_count = 0
             threats_count = 0
             evasion_count = 0
+            caught_count = 0
 
             if self._db:
                 all_ips = self._db.get_all_ips()
@@ -166,31 +167,37 @@ class Fail2banPlusTab(Vertical, can_focus=True):
                     if bans.get("total", 0) > 0 and not bans.get("active"):
                         unbanned_count += 1
 
-                    # Threats = evasion_detected (slow brute-force pattern)
-                    # This matches the original SLOW jail logic
                     analysis = data.get("analysis", {})
+                    
+                    # Threats = evasion_detected (slow brute-force, never banned)
                     if analysis.get("evasion_detected"):
                         threats_count += 1
 
-                    # Currently evading
+                    # Currently evading (active within 72h)
                     if analysis.get("evasion_active"):
                         evasion_count += 1
+                    
+                    # Caught = threat_detected (slow brute-force that was banned)
+                    if analysis.get("threat_detected"):
+                        caught_count += 1
 
-                logger.debug(f"Calculated: unbanned={unbanned_count}, threats={threats_count}, evasion={evasion_count}")
+                logger.debug(f"Calculated: unbanned={unbanned_count}, threats={threats_count}, evasion={evasion_count}, caught={caught_count}")
 
             # === Build header ===
-            # Line 1: Fail2ban: Running │ X jails │ Y banned │ Z unbanned │ W threats (N EVADING)
+            # Line 1: Fail2ban: Running │ X jails │ Y banned │ Z unbanned │ W threats (N EVADING) │ M caught
             if evasion_count > 0:
                 threats_display = f"[yellow]{threats_count}[/yellow] threats ([bold red]{evasion_count} EVADING[/bold red])"
             else:
                 threats_display = f"[yellow]{threats_count}[/yellow] threats"
+            
+            caught_display = f" │ [green]{caught_count}[/green] caught" if caught_count > 0 else ""
             
             line1 = (
                 f"[bold cyan]Fail2ban:[/bold cyan] {status_str} │ "
                 f"[white]{jails_count}[/white] jails │ "
                 f"[red]{total_banned}[/red] banned │ "
                 f"[blue]{unbanned_count}[/blue] unbanned │ "
-                f"{threats_display}"
+                f"{threats_display}{caught_display}"
             )
 
             # Line 2: Active: X/Y jails with bans │ Updated: HH:MM:SS
