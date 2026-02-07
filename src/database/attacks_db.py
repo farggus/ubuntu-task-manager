@@ -684,14 +684,14 @@ class AttacksDatabase:
                     result["min_interval"] = min(intervals)
                     result["max_interval"] = max(intervals)
 
-                    # EVADING detection: most intervals are just above findtime
-                    # This indicates intentional timing to avoid ban
-                    evasion_threshold = findtime * 1.1  # 10% above findtime
-                    long_intervals = [i for i in intervals if i > findtime]
-                    evasion_intervals = [i for i in intervals if findtime < i < evasion_threshold * 2]
-
-                    # If >50% intervals are in evasion range, flag as evasion
-                    if len(intervals) >= 3 and len(evasion_intervals) / len(intervals) > 0.5:
+                    # CAUGHT (evasion_detected) = slow brute-force pattern
+                    # IP with average interval > findtime = deliberately slow to avoid ban
+                    # This matches the original SLOW BRUTE-FORCE DETECTOR logic
+                    avg_interval = result["avg_interval"]
+                    
+                    # Condition: avg_interval > findtime with enough attempts
+                    # This catches IPs that space their attempts to avoid findtime window
+                    if avg_interval and avg_interval > findtime and len(intervals) >= 2:
                         result["evasion_detected"] = True
 
                     # EVASION_ACTIVE = evasion detected and not currently banned and recent activity
