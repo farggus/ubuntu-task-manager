@@ -684,24 +684,21 @@ class AttacksDatabase:
                     result["min_interval"] = min(intervals)
                     result["max_interval"] = max(intervals)
 
-                    # CAUGHT (evasion_detected) = slow brute-force pattern
-                    # IP with average interval > findtime = deliberately slow to avoid ban
-                    # This matches the original SLOW BRUTE-FORCE DETECTOR logic
+                    # evasion_detected (threats) = slow brute-force that was NEVER banned
+                    # IP with avg_interval > findtime AND bans == 0 = successfully evading detection
                     avg_interval = result["avg_interval"]
                     
-                    # Condition: avg_interval > findtime with enough attempts
-                    # This catches IPs that space their attempts to avoid findtime window
-                    if avg_interval and avg_interval > findtime and len(intervals) >= 2:
+                    # Condition: slow pattern + never caught
+                    if avg_interval and avg_interval > findtime and len(intervals) >= 2 and bans_total == 0:
                         result["evasion_detected"] = True
-
-                    # EVASION_ACTIVE = evasion detected and not currently banned and recent activity
-                    if result["evasion_detected"] and not is_active:
+                        
+                        # evasion_active (EVADING) = evasion_detected + active within 72 hours
                         last_attempt = record.get("attempts", {}).get("last_attempt")
                         if last_attempt:
                             try:
                                 last_dt = datetime.fromisoformat(last_attempt.replace("Z", "+00:00"))
                                 hours_ago = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
-                                if hours_ago < 24:  # Active within last 24 hours
+                                if hours_ago < 72:  # Active within last 72 hours
                                     result["evasion_active"] = True
                             except (ValueError, TypeError):
                                 pass

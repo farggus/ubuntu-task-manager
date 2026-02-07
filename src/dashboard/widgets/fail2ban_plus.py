@@ -179,14 +179,18 @@ class Fail2banPlusTab(Vertical, can_focus=True):
                 logger.debug(f"Calculated: unbanned={unbanned_count}, threats={threats_count}, evasion={evasion_count}")
 
             # === Build header ===
-            # Line 1: Fail2ban: Running │ X jails │ Y banned │ Z unbanned │ W threats
-            evasion_alert = f" │ [bold red blink]{evasion_count} EVADING[/bold red blink]" if evasion_count else ""
+            # Line 1: Fail2ban: Running │ X jails │ Y banned │ Z unbanned │ W threats (N EVADING)
+            if evasion_count > 0:
+                threats_display = f"[yellow]{threats_count}[/yellow] threats ([bold red]{evasion_count} EVADING[/bold red])"
+            else:
+                threats_display = f"[yellow]{threats_count}[/yellow] threats"
+            
             line1 = (
                 f"[bold cyan]Fail2ban:[/bold cyan] {status_str} │ "
                 f"[white]{jails_count}[/white] jails │ "
                 f"[red]{total_banned}[/red] banned │ "
                 f"[blue]{unbanned_count}[/blue] unbanned │ "
-                f"[yellow]{threats_count}[/yellow] threats{evasion_alert}"
+                f"{threats_display}"
             )
 
             # Line 2: Active: X/Y jails with bans │ Updated: HH:MM:SS
