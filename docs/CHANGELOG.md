@@ -1,5 +1,54 @@
 # Changelog
 
+## [2.2.0](https://github.com/farggus/ubuntu-task-manager/compare/v2.1.0...v2.2.0) (2026-02-07)
+
+
+### Features
+
+* Add fails_before_ban tracking and caught slow brute-force display ([0db3364](https://github.com/farggus/ubuntu-task-manager/commit/0db33644ba713c01e3409859a518ebd54f3cdecf))
+* Broadened slow brute-force detection (avg_interval &gt; findtime) ([e4845a7](https://github.com/farggus/ubuntu-task-manager/commit/e4845a7e241c043a6e59658ce3187a75c9986b9e))
+* Phase 3 - Pattern detection and CAUGHT/EVADING logic ([a77cbb6](https://github.com/farggus/ubuntu-task-manager/commit/a77cbb66ede5da524e769dadef27868b87659123))
+* **processes:** add column sorting and optimize performance ([612b6d0](https://github.com/farggus/ubuntu-task-manager/commit/612b6d03fa0ae2ad4e5648f2c74fb7837ea007a6))
+* threats = slow brute-force with bans==0, EVADING = threats + 72h active ([c34e734](https://github.com/farggus/ubuntu-task-manager/commit/c34e73425cb4e8ef58a5e6a2d15ce8414aebe056))
+* **ui:** graceful degradation for unavailable services ([052f761](https://github.com/farggus/ubuntu-task-manager/commit/052f7612aaa6b70005db0ecdc3a306531e24b574))
+
+
+### Bug Fixes
+
+* caught requires fails_before_ban &gt;= 10 ([6f93b8d](https://github.com/farggus/ubuntu-task-manager/commit/6f93b8d1868ff6c7991ffd1d78060f34ad2f7279))
+* **f2b:** protect against None values in table refresh ([92b79b2](https://github.com/farggus/ubuntu-task-manager/commit/92b79b2883df35dd1d545d1319454df024eb986d))
+* **logger:** add user-friendly error for log file permission denied ([5976da0](https://github.com/farggus/ubuntu-task-manager/commit/5976da0786dd8443ece43f8756b1ad885267c04c))
+* **packages:** update package index before upgrade ([071be0d](https://github.com/farggus/ubuntu-task-manager/commit/071be0d12df364da9bbe36c87b7f3d4fbe868cc1))
+* **processes:** add missing ProcessesTab import in deferred init ([89b4baa](https://github.com/farggus/ubuntu-task-manager/commit/89b4baa23f72197bae2fd3c332e59456efe45291))
+* remove incorrect threat_detected=True for any banned IP ([f78c1bd](https://github.com/farggus/ubuntu-task-manager/commit/f78c1bdcf2f61f1ab92f8d25db4fcc62f0905150))
+* **tests:** extract _do_export_snapshot for testability ([7835659](https://github.com/farggus/ubuntu-task-manager/commit/783565953d4a58f30bfe58682d829145ed89fea9))
+* **tests:** prevent SMART background thread race conditions ([99ea77a](https://github.com/farggus/ubuntu-task-manager/commit/99ea77a1f0c5d2baec587640862f2ad84dc067dd))
+* threats now counts only evasion_detected (matches SLOW jail) ([b5a8c80](https://github.com/farggus/ubuntu-task-manager/commit/b5a8c8062cd12b014ffeb010c51e2d4546d6a049))
+
+
+### Performance Improvements
+
+* **collectors:** shared process cache to avoid duplicate iteration ([04087ae](https://github.com/farggus/ubuntu-task-manager/commit/04087aeb4f042ce5b5fe12e1278b9c6e3e8c2d86)), closes [#13](https://github.com/farggus/ubuntu-task-manager/issues/13)
+* **collectors:** single systemctl call in _get_service_stats() ([bf8886d](https://github.com/farggus/ubuntu-task-manager/commit/bf8886de7704eb154c86e49fd4d2f7cb9cc82f29))
+* **dashboard:** non-blocking export_snapshot with [@work](https://github.com/work) ([530da43](https://github.com/farggus/ubuntu-task-manager/commit/530da43794b6fe24eb3e6aee6b932f6b3dbe6865))
+* **dashboard:** refresh only active tab instead of all widgets ([f5e884f](https://github.com/farggus/ubuntu-task-manager/commit/f5e884fd96dd091b831908bcdd59caf3296d7f06))
+* **logging:** quick preview + background full load ([c0782d9](https://github.com/farggus/ubuntu-task-manager/commit/c0782d9558d3ca4555e1b55a1ef191a0850f1823))
+* **startup:** add detailed profiling and defer dashboard imports ([5ea5671](https://github.com/farggus/ubuntu-task-manager/commit/5ea5671b5f63a53855f84b02f7d69a356d7020bf))
+* **startup:** defer Fail2ban+ data loading and reduce debug logging ([922ff28](https://github.com/farggus/ubuntu-task-manager/commit/922ff289feccad7ccad5459f1640c16c790dfd8b))
+* **startup:** defer ProcessesTab creation to eliminate 600ms+ freeze ([2aee630](https://github.com/farggus/ubuntu-task-manager/commit/2aee63085739f82f9cd39a47d04ef691dfb9d7ef))
+* **system:** non-blocking SMART collection with extended disk cache ([60c2020](https://github.com/farggus/ubuntu-task-manager/commit/60c2020e24753c10bc028a61fe5d0d8922a11a67))
+* **system:** parallelize SystemCollector with background caching ([5002e09](https://github.com/farggus/ubuntu-task-manager/commit/5002e09893c120460f692b13bcbd8ad7f3954889))
+* **ui:** defer initial data load to avoid blocking UI startup ([0953ae4](https://github.com/farggus/ubuntu-task-manager/commit/0953ae471caa4a73f00d289e3a62144bd45f0041))
+* **ui:** implement progressive data rendering in System Information ([42c9c69](https://github.com/farggus/ubuntu-task-manager/commit/42c9c6973668db2884f1509ef720b66a430f03e4))
+* **widgets:** lazy data loading with on_show instead of on_mount ([11df2cc](https://github.com/farggus/ubuntu-task-manager/commit/11df2cc87105381540e1399e6b975f72bcfb73ae))
+
+
+### Documentation
+
+* add SECURITY.md with vulnerability reporting policy ([20c62f5](https://github.com/farggus/ubuntu-task-manager/commit/20c62f529709aed5a63e5b0b882ae2abe3cba149))
+* Update known issues documentation. ([d68cc55](https://github.com/farggus/ubuntu-task-manager/commit/d68cc55187e9ad51c1d63688faa2e24f20653419))
+* update version to 2.1 and document lazy loading pattern ([a94d207](https://github.com/farggus/ubuntu-task-manager/commit/a94d2076b2d2273e4728bf4cfeea5d0f466247fc))
+
 ## [2.1.0](https://github.com/farggus/ubuntu-task-manager/compare/v2.0.0...v2.1.0) (2026-01-30)
 
 
