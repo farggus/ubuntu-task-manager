@@ -709,7 +709,10 @@ class AttacksDatabase:
                                     pass
                         else:
                             # threat_detected = slow brute-force that WAS caught (historical)
-                            result["threat_detected"] = True
+                            # Only count if had at least 10 attempts before first ban
+                            fails_before = record.get("analysis", {}).get("fails_before_ban", 0)
+                            if fails_before >= 10:
+                                result["threat_detected"] = True
 
             except Exception as e:
                 logger.debug(f"Pattern analysis error for {ip}: {e}")
