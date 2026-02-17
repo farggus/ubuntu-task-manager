@@ -6,7 +6,7 @@ parsing controls, statistics, and data table view.
 """
 
 import time
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from textual import on, work
 from textual.app import ComposeResult
@@ -20,6 +20,17 @@ from database.attacks_db import AttacksDatabase
 from utils.logger import get_logger
 
 logger = get_logger("f2b_db_modal")
+
+# Column definitions: (key, label, sort_key_func)
+COLUMNS: List[Tuple[str, str, Any]] = [
+    ("ip", "IP", lambda x: x["ip"]),
+    ("country", "Country", lambda x: (x.get("geo") or {}).get("country") or ""),
+    ("org", "Org", lambda x: (x.get("geo") or {}).get("org") or ""),
+    ("attempts", "Attempts", lambda x: (x.get("attempts") or {}).get("total", 0)),
+    ("bans", "Bans", lambda x: (x.get("bans") or {}).get("total", 0)),
+    ("status", "Status", lambda x: 1 if (x.get("bans") or {}).get("active") else 0),
+    ("danger", "Danger", lambda x: x.get("danger_score", 0)),
+]
 
 
 class F2BDatabaseModal(ModalScreen):
@@ -80,6 +91,9 @@ class F2BDatabaseModal(ModalScreen):
         super().__init__()
         self._db: Optional[AttacksDatabase] = None
         self._collector: Optional[Fail2banV2Collector] = None
+        self._all_data: List[Dict[str, Any]] = []
+        self._sort_column: int = 6  # Default: Danger
+        self._sort_reverse: bool = True  # Descending
 
     def compose(self) -> ComposeResult:
         """Build the modal UI."""
@@ -103,11 +117,54 @@ class F2BDatabaseModal(ModalScreen):
 
         # Setup table
         table = self.query_one("#f2b-modal-table", DataTable)
-        table.add_columns("IP", "Country", "Org", "Attempts", "Bans", "Status", "Danger")
+        self._setup_columns(table)
         table.cursor_type = "row"
         table.zebra_stripes = True
 
         self._update_status("Database loaded. Ready.")
+        self._load_all_data()
+        self._refresh_table()
+
+    def _setup_columns(self, table: DataTable) -> None:
+        """Setup table columns with sort indicators."""
+        table.clear(columns=True)
+        for idx, (key, label, _) in enumerate(COLUMNS):
+            if idx == self._sort_column:
+                arrow = "▼" if self._sort_reverse else "▲"
+                display_label = f"{label} {arrow}"
+            else:
+                display_label = label
+            table.add_column(display_label, key=key)
+
+    def _load_all_data(self) -> None:
+        """Load all IPs from database."""
+        if not self._db:
+            self._all_data = []
+            return
+
+        all_ips = self._db.get_all_ips()
+        self._all_data = [{"ip": ip, **data} for ip, data in all_ips.items()]
+
+    @on(DataTable.HeaderSelected, "#f2b-modal-table")
+    def on_header_click(self, event: DataTable.HeaderSelected) -> None:
+        """Handle column header click for sorting."""
+        col_idx = event.column_index
+
+        if col_idx < 0 or col_idx >= len(COLUMNS):
+            return
+
+        # Toggle direction if same column, otherwise set new column
+        if col_idx == self._sort_column:
+            self._sort_reverse = not self._sort_reverse
+        else:
+            self._sort_column = col_idx
+            self._sort_reverse = True  # Default descending for new column
+
+        logger.info(f"Sort by column {col_idx} ({COLUMNS[col_idx][1]}), reverse={self._sort_reverse}")
+
+        # Rebuild table with new sort
+        table = self.query_one("#f2b-modal-table", DataTable)
+        self._setup_columns(table)
         self._refresh_table()
 
     @on(Button.Pressed, "#btn-parse")
@@ -164,6 +221,7 @@ class F2BDatabaseModal(ModalScreen):
                 msg = f"❌ Failed: {result.get('error', 'Unknown')}"
 
             self.app.call_from_thread(self._update_status, msg)
+            self.app.call_from_thread(self._load_all_data)
             self.app.call_from_thread(self._refresh_table)
 
         except Exception as e:
@@ -194,6 +252,7 @@ class F2BDatabaseModal(ModalScreen):
             )
 
             self.app.call_from_thread(self._update_status, msg)
+            self.app.call_from_thread(self._load_all_data)
             self.app.call_from_thread(self._refresh_table)
 
         except Exception as e:
@@ -202,16 +261,18 @@ class F2BDatabaseModal(ModalScreen):
 
     def action_show_stats(self) -> None:
         """Show database stats."""
+        logger.info("Stats button pressed")
         if not self._db:
             self._update_status("❌ DB not loaded")
             return
 
         stats = self._db.get_stats()
+        logger.info(f"Stats: {stats}")
         msg = (
-            f"📊 {stats['total_ips']} IPs, "
-            f"{stats['total_attempts']} attempts, "
-            f"{stats['total_bans']} bans, "
-            f"{stats['active_bans']} active"
+            f"📊 {stats.get('total_ips', 0)} IPs, "
+            f"{stats.get('total_attempts', 0)} attempts, "
+            f"{stats.get('total_bans', 0)} bans, "
+            f"{stats.get('active_bans', 0)} active"
         )
 
         if stats.get("top_country"):
@@ -239,17 +300,19 @@ class F2BDatabaseModal(ModalScreen):
             pass
 
     def _refresh_table(self) -> None:
-        """Refresh the data table."""
+        """Refresh the data table with current sort order."""
         try:
             table = self.query_one("#f2b-modal-table", DataTable)
             table.clear()
 
-            if not self._db:
+            if not self._all_data:
                 return
 
-            threats = self._db.get_top_threats(limit=100)
+            # Sort data
+            sort_key = COLUMNS[self._sort_column][2]
+            sorted_data = sorted(self._all_data, key=sort_key, reverse=self._sort_reverse)
 
-            for item in threats:
+            for item in sorted_data:
                 ip = item["ip"]
                 geo = item.get("geo") or {}
                 attempts = item.get("attempts") or {}
@@ -261,13 +324,15 @@ class F2BDatabaseModal(ModalScreen):
 
                 table.add_row(
                     ip,
-                    geo.get("country", "?")[:15],
-                    geo.get("org", "?")[:25],
+                    (geo.get("country") or "?")[:15],
+                    (geo.get("org") or "?")[:25],
                     str(attempts.get("total", 0)),
                     str(bans.get("total", 0)),
                     status,
                     danger_str,
                     key=ip,
                 )
+
+            self._update_status(f"Loaded {len(sorted_data)} IPs")
         except Exception as e:
             logger.error(f"Table refresh failed: {e}")
